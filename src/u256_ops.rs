@@ -1,6 +1,7 @@
 use std::ops;
 use std::cmp;
 use cmp::Ordering;
+use crate::u256;
 use crate::u256::U256;
 
 impl ops::Add<U256> for U256 {
@@ -29,7 +30,12 @@ impl ops::Mul<U256> for U256 {
 	type Output = U256;
 
 	fn mul(self, rhs: U256) -> Self::Output {
-		
+		if self == u256::ZERO || rhs == u256::ZERO { u256::ZERO }
+		else if self == u256::ONE { rhs }
+		else if rhs == u256::ONE { self }
+		else {
+			
+		}
 	}
 }
 
