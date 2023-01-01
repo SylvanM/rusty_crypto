@@ -3,6 +3,8 @@
 
 use std::fmt::Debug;
 use std::convert;
+use std::io::BufWriter;
+use std::ops::RangeFrom;
 use std::slice::from_raw_parts;
 use num_traits::PrimInt;
 
@@ -56,6 +58,22 @@ impl U256 {
 		let first_str = format!("{:032X}", self.words[0]);
 		let second_str = format!("{:#034X}", self.words[1]);
 		format!("{}{}", second_str, first_str)
+	}
+
+	pub fn to_bytes(self) -> [u8 ; 32] {
+		let mut bytes: [u8 ; 32] = [0 ; 32];
+		let first_word_bytes = self.words[0].to_le_bytes();
+		let second_word_bytes = self.words[1].to_le_bytes();
+		
+		for i in 0..16 {
+			bytes[i] = first_word_bytes[i];
+		}
+
+		for i in 0..16 {
+			bytes[i + 16] = second_word_bytes[i]; 
+		}
+
+		bytes
 	}
 
 }
@@ -140,4 +158,5 @@ impl convert::From<[u8 ; 32]> for U256 {
 		let second_word = u128::from_le_bytes(hi.try_into().expect("couldn't convert hi slice type"));
 		U256 { words: [first_word, second_word] }
 	}
+
 }
