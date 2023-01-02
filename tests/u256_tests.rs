@@ -17,6 +17,30 @@ fn test_bignumber_constuctors() {
 }
 
 #[test]
+fn test_byte_conversions() {
+	let mut bytes: [u8 ; 32] = [0 ; 32];
+	for i in 0..32 {
+		bytes[i] = i as u8;
+	}
+
+	let bignum = U256::from_bytes(bytes);
+	assert_eq!(bytes, bignum.to_bytes());
+	
+	let words = [
+		0x8070605040302010,
+		0xAA12312312312310,
+		0xFFFFFFFFFFFFFFFF,
+		0xAAAAAAAAAAAAAAAA
+	];
+
+	let a: U256 = "0xAAAAAAAAAAAAAAAAFFFFFFFFFFFFFFFFAA123123123123108070605040302010".into();
+
+	assert_eq!(a, U256::from_le_u64(words));
+	assert_eq!(a.to_u64(), words);
+
+}
+
+#[test]
 fn test_bignumber_strs() {
 	let a = U256::from_hex_str("0x1");
 	assert_eq!(a, 1.into());
@@ -50,4 +74,13 @@ fn test_bignumber_sub() {
 	let one: U256 = 1.into();
 	let diff2 = zero - one;
 	assert_eq!(diff2.words, [0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF])
+}
+
+#[test]
+fn test_bignumber_mul() {
+	let a: U256 = "0x2EC64DDFC60B42204862EFA12C35973D2E871283E2EA4EB9DF30CB1B501E434C".into();
+	let b: U256 = "0xAC42518BF63B731220D4CD212118D440636CCA11D22B9891937F2B2428657E35".into();
+	let p: U256 = "0xA44C84C82A68311D3D24516603F78748F7D2E4916CDBFA51FFA00F3AE85F56BC".into();
+
+	assert_eq!(a * b, p);
 }

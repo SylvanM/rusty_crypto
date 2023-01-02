@@ -3,10 +3,8 @@
 
 use std::fmt::Debug;
 use std::convert;
-use std::io::BufWriter;
-use std::ops::RangeFrom;
 use std::slice::from_raw_parts;
-use num_traits::PrimInt;
+use std::mem::{self, transmute};
 
 /**
  * The integer type for the coordinates of our finite field
@@ -18,6 +16,8 @@ pub struct U256 {
 
 pub const ZERO: U256 = U256 { words: [0, 0] };
 pub const ONE: 	U256 = U256 { words: [1, 0] };
+
+pub type WordType = u128;
 
 // Debugging and Utility
 
@@ -53,7 +53,6 @@ impl U256 {
 	
 	}
 
-
 	pub fn to_hex(self) -> String {
 		let first_str = format!("{:032X}", self.words[0]);
 		let second_str = format!("{:#034X}", self.words[1]);
@@ -74,6 +73,35 @@ impl U256 {
 		}
 
 		bytes
+	}
+
+	pub fn to_u64(self) -> [u64 ; 4] {
+		unsafe { 
+			mem::transmute::<[u8 ; 32], [u64 ; 4]>(self.to_bytes()) 
+		}
+	}
+
+	 pub fn from_bytes(bytes: [u8 ; 32]) -> Self {
+		let lo = &bytes[0..16];
+		let hi = &bytes[16..32];
+		let first_word = u128::from_le_bytes(lo.try_into().expect("couldn't convert lo slice type"));
+		let second_word = u128::from_le_bytes(hi.try_into().expect("couldn't convert hi slice type"));
+		U256 { words: [first_word, second_word] }
+	}
+
+	pub fn from_le_u64(le_words: [u64 ; 4]) -> U256 {
+		let mut bytes: [u8 ; 32] = [0 ; 32];
+
+		unsafe {
+			for i in 0..4 {
+				let word_bytes = transmute::<u64, [u8 ; 8]>(le_words[i]);
+				for j in 0..8 {
+					bytes[j + (i * 8)] = word_bytes[j];
+				}
+			}
+		}
+
+		U256::from_bytes(bytes)
 	}
 
 }
@@ -138,25 +166,40 @@ impl convert::From<u128> for U256 {
 	}
 }
 
+impl convert::From<i8> for U256 {
+	fn from(value: i8) -> Self {
+		U256 { words: [value as u128, 0] }
+	}
+}
+
+impl convert::From<i16> for U256 {
+	fn from(value: i16) -> Self {
+		U256 { words: [value as u128, 0] }
+	}
+}
+
+impl convert::From<i32> for U256 {
+	fn from(value: i32) -> Self {
+		U256 { words: [value as u128, 0] }
+	}
+}
+
+impl convert::From<i64> for U256 {
+	fn from(value: i64) -> Self {
+		U256 { words: [value as u128, 0] }
+	}
+}
+
+impl convert::From<i128> for U256 {
+	fn from(value: i128) -> Self {
+		U256 { words: [value as u128, 0] }
+	}
+}
+
 // Other conversion types
 
 impl convert::From<&str> for U256 {
 	fn from(value: &str) -> Self {
 		U256::from_hex_str(value)
 	}
-}
-
-impl convert::From<[u8 ; 32]> for U256 {
-
-	/**
-	 * Converts a byte sequence to a U256, interpreting the sequence as little-endian
-	 */
-	fn from(value: [u8 ; 32]) -> Self {
-		let lo = &value[0..16];
-		let hi = &value[16..32];
-		let first_word = u128::from_le_bytes(lo.try_into().expect("couldn't convert lo slice type"));
-		let second_word = u128::from_le_bytes(hi.try_into().expect("couldn't convert hi slice type"));
-		U256 { words: [first_word, second_word] }
-	}
-
 }
