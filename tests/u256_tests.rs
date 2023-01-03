@@ -84,3 +84,14 @@ fn test_bignumber_mul() {
 
 	assert_eq!(a * b, p);
 }
+
+#[test]
+fn test_bignumber_div() {
+	let a: U256 = "0xAC42518BF63B731220D4CD212118D440636CCA11D22B9891937F2B2428657E35".into();
+	let b: U256 = "0x2EC64DDFC60B42204862EFA12C35973D2E871283E2EA4EB9DF30CB1B501E434C".into();
+	let q: U256 = "0x3".into();
+	let r: U256 = "0x1fef67eca419acb147abfe3d9c780e88d7d79286296cac63f5ecc9d2380ab451".into();
+
+	assert_eq!(a / b, q);
+	assert_eq!(a % b, r);
+}

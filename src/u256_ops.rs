@@ -23,12 +23,7 @@ fn addmul(a: u64, b: u64, c: u64, d: u64) -> (u64, u64) {
 	lo = add.0;
 
 	if add.1 { hi = hi.wrapping_add(1); }
-
-	println!("{} {} {} {}", a, b, c, d);
-	println!("{}", lo);
-	println!("{}", hi);
-	println!("NEXT");
-
+	
 	(lo, hi)
 }
 
@@ -124,7 +119,10 @@ impl ops::ShlAssign for U256 {
 
 		// now shift those bits!
 		self.words[1] <<= bitshift;
-		self.words[1] += self.words[0] >> (bitwidth - bitshift);
+		self.words[1] += match self.words[0].checked_shr((bitwidth - bitshift) as u32) {
+			Some(x) => x,
+			None => 0
+		};
 		self.words[0] <<= bitshift;
 
 	}
@@ -165,7 +163,12 @@ impl ops::ShrAssign for U256 {
 
 		// now shift those bits!
 		self.words[0] >>= bitshift;
-        self.words[0] += self.words[1] << (bitwidth - bitshift);
+		
+		self.words[0] += match self.words[1].checked_shl((bitwidth - bitshift) as u32) {
+			Some(x) => x,
+			None => 0
+		};
+
 		self.words[1] >>= bitshift;
 		
 	}
