@@ -52,18 +52,21 @@ impl U256 {
 			let div_size = if divisor.words[1] != 0 { 2 } else { 1 };
 			let rem_size = if remainder.words[1] != 0 { 2 } else { 1 };
             
-            if remainder.words[1] >= divisor.words[1] {
-                partial_quotient.words[0] = remainder.words[1] / divisor.words[1];
-				partial_quotient <<= ((rem_size - div_size) * u256::WordType::BITS).into();
+            if remainder.words[rem_size - 1] >= divisor.words[div_size - 1] {
+                partial_quotient.words[0] = remainder.words[rem_size - 1] / divisor.words[div_size - 1];
+				partial_quotient <<= (((rem_size as u32) - (div_size as u32)) * u256::WordType::BITS).into();
             }
             else {
-				partial_product <<= (((rem_size - div_size) * u256::WordType::BITS) + divisor.words[1].leading_zeros() - remainder.words[1].leading_zeros()).into();
+				partial_product <<= (
+					(
+						((rem_size as u32) - (div_size as u32)) * u256::WordType::BITS
+					) 
+					+ divisor.words[div_size - 1].leading_zeros() - remainder.words[rem_size - 1].leading_zeros()).into();
             }
 
 			partial_product = divisor * partial_quotient;
             
             while partial_product > *remainder {
-                
                 if partial_quotient.words[0] & 1 == 0 {
 					partial_product >>= 1.into();
 					partial_quotient >>= 1.into();
@@ -74,6 +77,11 @@ impl U256 {
                 }
                 
             }
+
+			// print!("remainder: \t{:?}\t", remainder);
+			// // print!("- {:?}", partial_product);
+			// print!("cmp\t{:?}", divisor);
+			// print!("\n");
 
 			*remainder -= partial_product;
 			*quotient += partial_quotient;
@@ -265,7 +273,10 @@ impl ops::Rem<U256> for U256 {
 	fn rem(self, rhs: U256) -> Self::Output {
 		let mut rem = u256::ZERO;
 		let mut quo = u256::ZERO;
+		println!("Trying to compute remainder:");
+		println!("{:?} % {:?}\n", self, rhs);
 		U256::full_divide(self, rhs, &mut quo, &mut rem);
+		println!("Computed remainder: {:?}!", rem);
 		rem
 	}
 }
@@ -273,6 +284,65 @@ impl ops::Rem<U256> for U256 {
 impl ops::RemAssign<U256> for U256 {
 	fn rem_assign(&mut self, rhs: U256) {
 		*self = *self % rhs
+	}
+}
+
+impl ops::BitAndAssign for U256 {
+	fn bitand_assign(&mut self, rhs: Self) {
+		self.words[0] &= rhs.words[0];
+		self.words[1] &= rhs.words[1];
+	}
+}
+
+impl ops::BitAnd for U256 {
+	type Output = U256;
+
+	fn bitand(self, rhs: Self) -> Self::Output {
+		let mut a = self;
+		a &= rhs;
+		a
+	}
+}
+
+impl ops::BitOrAssign for U256 {
+	fn bitor_assign(&mut self, rhs: Self) {
+		self.words[0] |= rhs.words[0];
+		self.words[1] |= rhs.words[1];
+	}
+}
+
+impl ops::BitOr for U256 {
+	type Output = U256;
+	
+	fn bitor(self, rhs: Self) -> Self::Output {
+		let mut a = self;
+		a |= rhs;
+		a
+	}
+}
+
+impl ops::BitXorAssign for U256 {
+	fn bitxor_assign(&mut self, rhs: Self) {
+		self.words[0] ^= rhs.words[0];
+		self.words[1] ^= rhs.words[1];
+	}
+}
+
+impl ops::BitXor for U256 {
+	type Output = U256;
+	
+	fn bitxor(self, rhs: Self) -> Self::Output {
+		let mut a = self;
+		a |= rhs;
+		a
+	}
+}
+
+impl ops::Not for U256 {
+	type Output = U256;
+
+	fn not(self) -> Self::Output {
+		U256 { words: [!self.words[0], !self.words[1]] }
 	}
 }
 

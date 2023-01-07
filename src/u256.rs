@@ -9,7 +9,7 @@ use std::mem::{self, transmute};
 /**
  * The integer type for the coordinates of our finite field
  */
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Eq, Ord)]
 pub struct U256 {
 	pub words: [u128 ; 2]
 }
@@ -22,6 +22,37 @@ pub type WordType = u128;
 // Debugging and Utility
 
 impl U256 {
+
+	pub fn gcd(a: U256, b: U256) -> U256 {
+		if a == ZERO {
+			b
+		} else {
+			Self::gcd(b % a, a)
+		}
+	}
+
+	/**
+	 * The Extended Euclidean Algorithm
+	 *
+	 * Computes x and y, such that
+	 * 		ax + by = gcd(a, b)
+	 */
+	pub fn ext_gcd(a: U256, b: U256, x: &mut U256, y: &mut U256) -> U256 {
+		if a == ZERO {
+			*x = ZERO;
+			*y = ONE;
+			b
+		} else {
+			let mut xp: U256 = ZERO;
+			let mut yp: U256 = ZERO;
+
+			let g = Self::ext_gcd(b % a, a, &mut xp, &mut yp);
+
+			*x = yp - (b / a) * xp;
+			*y = xp;
+			g
+		}
+	}
 
 	pub fn from_hex_str(hex: &str) -> U256 {
 		let bytes = hex.as_bytes();

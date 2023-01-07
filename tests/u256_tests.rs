@@ -95,3 +95,25 @@ fn test_bignumber_div() {
 	assert_eq!(a / b, q);
 	assert_eq!(a % b, r);
 }
+
+#[test]
+fn test_gcd() {
+	let mut a: U256 = "0x00000000000000000000000000000000C7DAE9C9DBB1E340EEA6CC4DA87AD640".into();
+	let mut b: U256 = "0x00000000000000000000000000000001782476BDD39D43D025B4BA55D2323CE3".into();
+
+	let mut x: U256 = u256::ZERO;
+	let mut y: U256 = u256::ZERO;
+
+	let mut g = U256::ext_gcd(a, b, &mut x, &mut y);
+
+	println!("{:?}", g);
+
+	a = 1398.into();
+	b = 324.into();
+
+	g = U256::ext_gcd(a, b, &mut x, &mut y);
+
+	assert_eq!(g, 6.into());
+	println!("x: {:?}", x);
+	println!("y: {:?}", y);
+}
