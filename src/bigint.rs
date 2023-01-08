@@ -2,6 +2,7 @@
 // A simple fixed-width big integer implementation for the purposes of ECC
 //
 
+use std::f32::consts::E;
 use std::mem::transmute;
 use std::slice::from_raw_parts;
 use std::ops::{
@@ -131,12 +132,92 @@ impl BigInt {
 			string
 		}
 	}
+	
+	/**
+	 * Accesses the most significant word of this `BigInt`
+	 */
+	fn msw(&mut self) -> &mut Word {
+		&mut self.words[self.size()]
+	}
+
+	/**
+	 * The number of words needed to represent this `BigInt`
+	 */
+	fn size(self) -> usize {
+		for i in (0..WORD_COUNT).rev() {
+			if self[i] != 0 { 
+				return i + 1;
+			}
+		}
+		1
+	}
+
+	/**
+	 * Accesses the least significant word of this `BigInt`
+	 */
+	fn lsw(&mut self) -> &mut Word {
+		&mut self.words[0]
+	}
 
 	/**
 	 * Computes the quotient and remainder after division
 	 */
 	pub fn full_divide(self, divisor: BigInt) -> (BigInt, BigInt) {
-		// TODO: Actually do this!
+		assert!(divisor != Self::ZERO, "Divide by zero error!");
+
+		let mut quotient = Self::ZERO;
+		let mut remainder = self;
+
+		if divisor > self { 
+			return (quotient, remainder);
+		}
+
+		if divisor == self {
+			return (Self::ONE, Self::ZERO);
+		}
+
+        while remainder >= divisor {
+
+			let mut partial_product	= self;
+        	let mut partial_quotient = Self::ONE;
+            
+            if *remainder.msw() >= *divisor.msw() {
+                *partial_quotient.lsw() = *remainder.msw() / *divisor.msw();
+				partial_quotient <<= (((remainder.size() as u32) - (self.size() as u32)) * Word::BITS).into();
+            }
+            else {
+				partial_product <<= (
+					(
+						((rem_size as u32) - (div_size as u32)) * u256::WordType::BITS
+					) 
+					+ divisor.words[div_size - 1].leading_zeros() - remainder.words[rem_size - 1].leading_zeros()).into();
+            }
+
+			partial_product = divisor * partial_quotient;
+            
+            while partial_product > *remainder {
+                if partial_quotient.words[0] & 1 == 0 {
+					partial_product >>= 1.into();
+					partial_quotient >>= 1.into();
+                }
+                else {
+					partial_quotient.words[0] = partial_quotient.words[0].wrapping_sub(1);
+					partial_product -= divisor;
+                }
+                
+            }
+
+			// print!("remainder: \t{:?}\t", remainder);
+			// // print!("- {:?}", partial_product);
+			// print!("cmp\t{:?}", divisor);
+			// print!("\n");
+
+			*remainder -= partial_product;
+			*quotient += partial_quotient;
+            
+        }
+
+		(remainder, quotient)
 	}
 	
 }
@@ -287,5 +368,71 @@ impl Rem<BigInt> for BigInt {
 impl RemAssign<BigInt> for BigInt {
 	fn rem_assign(&mut self, rhs: BigInt) {
 		(_, *self) = self.full_divide(rhs);
+	}
+}
+
+impl ShlAssign for BigInt {
+	fn shl_assign(&mut self, rhs: Self) {
+		let shift = self[0]; // not goint to bother generalizing
+		let bitshift = shift % Word::BITS as Word;
+		let wordshift = shift / Word::BITS as Word;
+
+		for i in (wordshift..(WORD_COUNT) as u64).rev() {
+            self[i as usize] = self[(i - wordshift) as usize];
+        }
+
+        for i in 0..wordshift {
+            self[i as usize] = 0;
+        }
+
+        for i in (1..WORD_COUNT).rev() {
+            self[i] <<= bitshift;
+            self[i] += self[i - 1] >> (Word::BITS - bitshift as u32);
+        }
+
+        self[0] <<= bitshift;
+	}
+}
+
+impl Shl for BigInt {
+	type Output = BigInt;
+
+	fn shl(self, rhs: Self) -> Self::Output {
+		let mut shifted = self;
+		shifted.shl_assign(rhs);
+		shifted
+	}
+}
+
+impl ShrAssign for BigInt {
+	fn shr_assign(&mut self, rhs: Self) {
+		let shift = self[0]; // not goint to bother generalizing
+		let bitshift = shift % Word::BITS as Word;
+		let wordshift = shift / Word::BITS as Word;
+
+		for i in 0..(WORD_COUNT - wordshift as usize) {
+            self[i] = self[i + wordshift as usize];
+        }
+        
+        for i in (WORD_COUNT - wordshift as usize)..WORD_COUNT {
+            self[i] = 0;
+        }
+
+		for i in 0..(WORD_COUNT - 1) {
+            self[i] >>= bitshift;
+            self[i] += self[i + 1] << (Word::BITS - bitshift as u32);
+        }
+
+        self[WORD_COUNT - 1] >>= bitshift;
+	}
+}
+
+impl Shr for BigInt {
+	type Output = BigInt;
+
+	fn shr(self, rhs: Self) -> Self::Output {
+		let mut shifted = self;
+		shifted.shr_assign(rhs);
+		shifted
 	}
 }
