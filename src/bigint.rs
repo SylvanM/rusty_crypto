@@ -2,7 +2,6 @@
 // A simple fixed-width big integer implementation for the purposes of ECC
 //
 
-use std::f32::consts::E;
 use std::mem::transmute;
 use std::slice::from_raw_parts;
 use std::ops::{
@@ -72,6 +71,15 @@ impl BigInt {
 		let mut be_bytes = le_bytes;
 		be_bytes.reverse();
 		Self::from_be_bytes(be_bytes)
+	}
+
+	/**
+	 * Creates a `BigInt` from a single word
+	 */
+	pub const fn from(word: Word) -> BigInt {
+		let mut words = [0 ; WORD_COUNT];
+		words[0] = word;
+		BigInt { words }
 	}
 
 	/**
@@ -162,7 +170,7 @@ impl BigInt {
 	/**
 	 * Computes the quotient and remainder after division
 	 */
-	pub fn full_divide(self, divisor: BigInt) -> (BigInt, BigInt) {
+	pub fn full_divide(self, mut divisor: BigInt) -> (BigInt, BigInt) {
 		assert!(divisor != Self::ZERO, "Divide by zero error!");
 
 		let mut quotient = Self::ZERO;
@@ -183,37 +191,33 @@ impl BigInt {
             
             if *remainder.msw() >= *divisor.msw() {
                 *partial_quotient.lsw() = *remainder.msw() / *divisor.msw();
-				partial_quotient <<= (((remainder.size() as u32) - (self.size() as u32)) * Word::BITS).into();
+				let shift_amount = ((remainder.size() as u32) - (self.size() as u32)) * Word::BITS;
+				partial_quotient <<= Self::from(shift_amount.into());
             }
             else {
-				partial_product <<= (
-					(
-						((rem_size as u32) - (div_size as u32)) * u256::WordType::BITS
-					) 
-					+ divisor.words[div_size - 1].leading_zeros() - remainder.words[rem_size - 1].leading_zeros()).into();
+				let shift_amount =
+					(((remainder.size() as u32) - (self.size() as u32)) * Word::BITS ) 
+					+ divisor.msw().leading_zeros() - remainder.msw().leading_zeros();
+				
+				partial_product <<= BigInt::from(shift_amount.into());
             }
 
 			partial_product = divisor * partial_quotient;
             
-            while partial_product > *remainder {
-                if partial_quotient.words[0] & 1 == 0 {
-					partial_product >>= 1.into();
-					partial_quotient >>= 1.into();
+            while partial_product > remainder {
+                if *partial_quotient.lsw() & 1 == 0 {
+					partial_product >>= Self::ONE;
+					partial_quotient >>= Self::ONE;
                 }
                 else {
-					partial_quotient.words[0] = partial_quotient.words[0].wrapping_sub(1);
+					*partial_quotient.lsw() = partial_quotient.lsw().wrapping_sub(1);
 					partial_product -= divisor;
                 }
                 
             }
 
-			// print!("remainder: \t{:?}\t", remainder);
-			// // print!("- {:?}", partial_product);
-			// print!("cmp\t{:?}", divisor);
-			// print!("\n");
-
-			*remainder -= partial_product;
-			*quotient += partial_quotient;
+			remainder -= partial_product;
+			quotient += partial_quotient;
             
         }
 
@@ -373,7 +377,7 @@ impl RemAssign<BigInt> for BigInt {
 
 impl ShlAssign for BigInt {
 	fn shl_assign(&mut self, rhs: Self) {
-		let shift = self[0]; // not goint to bother generalizing
+		let shift = rhs[0]; // not goint to bother generalizing
 		let bitshift = shift % Word::BITS as Word;
 		let wordshift = shift / Word::BITS as Word;
 
@@ -406,7 +410,7 @@ impl Shl for BigInt {
 
 impl ShrAssign for BigInt {
 	fn shr_assign(&mut self, rhs: Self) {
-		let shift = self[0]; // not goint to bother generalizing
+		let shift = rhs[0]; // not goint to bother generalizing
 		let bitshift = shift % Word::BITS as Word;
 		let wordshift = shift / Word::BITS as Word;
 
