@@ -223,6 +223,62 @@ impl BigInt {
 
 		(remainder, quotient)
 	}
+
+	// -- Algorithms --
+
+	/// Computes gcd(a, b)
+	pub fn gcd(a: BigInt, b: BigInt) -> BigInt {
+		if a == Self::ZERO { b } else { Self::gcd(b % a, a) }
+	}
+
+	// -- Modular Operations --
+
+	/// Modular Exponentiation
+	/// 
+	/// Computes self^power (mod m)
+	pub fn pow_mod(self, power: BigInt, m: BigInt) -> BigInt {
+		// TODO: Make this double and add, could be way faster
+		if power == Self::ZERO {
+			Self::ONE
+		} else {
+			Self::mod_mul(self, self.pow_mod(power - Self::ONE, m), m)
+		}
+
+		// I know this is painfully inefficient, I'm just doing it so that
+		// I can get something written so I can test it.
+		
+	}
+
+	/// Computes the modular additive inverse, with a certain modulus
+	pub fn mod_add_inv(self, m: BigInt) -> BigInt {
+		m - self
+	}
+
+	/// Computes modular addition with a certain modulus
+	pub fn mod_add(a: BigInt, b: BigInt, m: BigInt) -> BigInt {
+		((a % b) + (b % m)) % m
+	}
+
+	/// Computes modular subtraction with a certain modulus
+	pub fn mod_sub(a: BigInt, b: BigInt, m: BigInt) -> BigInt {
+		((a % b) + (b % m).mod_add_inv(m)) % m
+	}
+
+	/// Computes the modular multiplicative inverse, with a certain prime modulus
+	pub fn prime_mod_mul_inv(self, m: BigInt) -> BigInt {
+		self.pow_mod(m - Self::from(2), m)
+	}
+
+	/// Computes modular multiplication with a certain modulus
+	pub fn mod_mul(a: BigInt, b: BigInt, m: BigInt) -> BigInt {
+		((a % b) * (b % m)) % m
+	}
+
+	/// Computes modular division via multiplication by inverse, with a 
+	/// prime modulus
+	pub fn mod_div(a: BigInt, b: BigInt, m: BigInt) -> BigInt {
+		Self::mod_mul(a, b.prime_mod_mul_inv(m), m)
+	}
 	
 }
 
