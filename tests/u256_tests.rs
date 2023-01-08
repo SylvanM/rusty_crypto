@@ -1,3 +1,4 @@
+use rusty_ecc::ed25519_num::{self};
 use rusty_ecc::u256::U256;
 use rusty_ecc::u256;
 
@@ -96,24 +97,86 @@ fn test_bignumber_div() {
 	assert_eq!(a % b, r);
 }
 
+
 #[test]
-fn test_gcd() {
-	let mut a: U256 = "0x00000000000000000000000000000000C7DAE9C9DBB1E340EEA6CC4DA87AD640".into();
-	let mut b: U256 = "0x00000000000000000000000000000001782476BDD39D43D025B4BA55D2323CE3".into();
+fn test_ed_gcd() {
+	let mut a: U256 = 180.into();
+	let mut b: U256 = 150.into();
 
 	let mut x: U256 = u256::ZERO;
 	let mut y: U256 = u256::ZERO;
 
 	let mut g = U256::ext_gcd(a, b, &mut x, &mut y);
 
-	println!("{:?}", g);
+	assert_eq!((a * x) + (b * y), g);
+	assert_eq!(g, 30.into());
 
-	a = 1398.into();
-	b = 324.into();
+	a = 191.into();
+	b = 43.into();
 
 	g = U256::ext_gcd(a, b, &mut x, &mut y);
 
-	assert_eq!(g, 6.into());
+	assert_eq!(g, 1.into());
+	assert_eq!((a * x) + (b * y), g);
+
+	a = 9.into();
+	b = 10.into();
+	g = U256::ext_gcd(a, b, &mut x, &mut y);
+
+	assert_eq!((a * x) + (b * y), g);
+
 	println!("x: {:?}", x);
 	println!("y: {:?}", y);
+
+	assert_eq!(((a % b) * (x % b)) % b, u256::ONE);
+	assert_eq!(((b % a) * (y % a)) % a, u256::ONE);
+
+	for _ in 0..99 {
+		a = U256::rnd();
+		b = U256::rnd();
+		g = U256::ext_gcd(a, b, &mut x, &mut y);
+
+		assert_eq!((a * x) + (b * y), g);
+	}
+
+	for _ in 0..99 {
+		a = U256::rnd();
+		b = "1ffffffffffffffffffffffffffffffffffffffffffffffffc9".into();
+		g = U256::ext_gcd(a, b, &mut x, &mut y);
+
+		assert_eq!((a * x) + (b * y), g);
+
+		if g == u256::ONE {
+			assert_eq!(((a % b) * (x % b)) % b, u256::ONE);
+			assert_eq!(((b % a) * (y % a)) % a, u256::ONE);
+		}
+		
+	}
+
+	for _ in 0..99 {
+		a = U256::rnd();
+		b = ed25519_num::FIELD_SIZE;
+		g = U256::ext_gcd(a, b, &mut x, &mut y);
+
+		assert_eq!((a * x) + (b * y), g);
+		
+		if g == u256::ONE {
+			assert_eq!(((a % b) * (x % b)) % b, u256::ONE);
+			assert_eq!(((b % a) * (y % a)) % a, u256::ONE);
+		}
+	}
+	
+}
+
+
+#[test]
+fn test_evil_mod() {
+	let a: U256 = "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF7".into();
+	let b: U256 = 0x2B.into();
+    
+	let rem = a % b;
+	let quo = a / b;
+
+	assert_eq!(quo, "0x5f417d05f417d05f417d05f417d05f417d05f417d05f417d05f417d05f417d0".into());
+	assert_eq!(rem, 0x7.into());
 }

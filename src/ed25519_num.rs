@@ -14,7 +14,7 @@ pub struct ED25519Num {
 	pub _num: U256 
 }
 
-const FIELD_SIZE: U256 = U256 { words: [0xffffffffffffffffffffffffffffffed, 0x7fffffffffffffffffffffffffffffff] };
+pub const FIELD_SIZE: U256 = U256 { words: [0xffffffffffffffffffffffffffffffed, 0x7fffffffffffffffffffffffffffffff] };
 
 impl ED25519Num {
 
@@ -25,12 +25,13 @@ impl ED25519Num {
 	 * Generates a random number part of the field
 	 */
 	pub fn rnd() -> ED25519Num {
-		let mut rng = rand::thread_rng();
-
-		// basically we're gonna do rejection sampling to get a number in the field.
-		let num = U256 { words: [rng.gen(), rng.gen()] };
+		let num = U256::rnd();
 
 		if num >= FIELD_SIZE {
+			// This could be a loop, but 1) recursion makes me feel cooler
+			// and 2) It is very unlikely that the recursion occurs, so 
+			// I don't think I'm risking harassing the stack much,
+			// and that's assuming Rust doesn't just make this a loop anyway.
 			Self::rnd()
 		} else {
 			ED25519Num { _num: num }
@@ -38,7 +39,7 @@ impl ED25519Num {
 	}
 	
 	/**
-	 * Compute the multiplicative inverse of this number
+	 * The multiplicative inverse of this number in the field
 	 */
 	pub fn mul_inv(self) -> ED25519Num {
 		let mut inv = u256::ZERO;
@@ -54,7 +55,8 @@ impl ED25519Num {
 	}
 
 	/**
-	 * Computes the self^x % FIELD_SIZE
+	 * Computes powers in this field
+	 * 		a.pow(x) = a^x % FIELD_SIZE
 	 */
 	pub fn pow(self, x: ED25519Num) -> ED25519Num {
 		if x == u256::ZERO.into() {

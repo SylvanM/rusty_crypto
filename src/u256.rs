@@ -5,6 +5,7 @@ use std::fmt::Debug;
 use std::convert;
 use std::slice::from_raw_parts;
 use std::mem::{self, transmute};
+use rand::Rng;
 
 /**
  * The integer type for the coordinates of our finite field
@@ -29,6 +30,14 @@ impl U256 {
 		} else {
 			Self::gcd(b % a, a)
 		}
+	}
+
+	/**
+	 * Generates a random number part of the field
+	 */
+	 pub fn rnd() -> U256 {
+		let mut rng = rand::thread_rng();
+		U256 { words: [rng.gen(), rng.gen()] }
 	}
 
 	/**
@@ -133,6 +142,15 @@ impl U256 {
 		}
 
 		U256::from_bytes(bytes)
+	}
+
+	/**
+	 * Computes the modular multiplicative inverse, modulo `m`
+	 */
+	pub fn mod_mul_inv(m: U256) -> U256 {
+		let mut inv = ZERO;
+		let mut y = ZERO;
+		
 	}
 
 }

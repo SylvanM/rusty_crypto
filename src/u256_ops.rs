@@ -44,24 +44,27 @@ impl U256 {
 			return;
 		}
 
+		
+
+		let div_size = if divisor.words[1] != 0 { 2 } else { 1 };
+
         while *remainder >= divisor {
 
-			let mut partial_product 	= dividend;
-        	let mut partial_quotient: U256 = 1.into();
+			let mut partial_product: U256;
+			let mut partial_quotient = u256::ONE;
 
-			let div_size = if divisor.words[1] != 0 { 2 } else { 1 };
 			let rem_size = if remainder.words[1] != 0 { 2 } else { 1 };
             
             if remainder.words[rem_size - 1] >= divisor.words[div_size - 1] {
                 partial_quotient.words[0] = remainder.words[rem_size - 1] / divisor.words[div_size - 1];
-				partial_quotient <<= (((rem_size as u32) - (div_size as u32)) * u256::WordType::BITS).into();
+				let shift_amount = ((rem_size - div_size) as u32) * u256::WordType::BITS;
+				partial_quotient <<= shift_amount.into();
             }
             else {
-				partial_product <<= (
-					(
-						((rem_size as u32) - (div_size as u32)) * u256::WordType::BITS
-					) 
-					+ divisor.words[div_size - 1].leading_zeros() - remainder.words[rem_size - 1].leading_zeros()).into();
+				let mut shift_amount = ((rem_size - div_size) as u32) * u256::WordType::BITS;
+				shift_amount += divisor.words[div_size - 1].leading_zeros();
+				shift_amount -= remainder.words[rem_size - 1].leading_ones();
+				partial_quotient <<= shift_amount.into();
             }
 
 			partial_product = divisor * partial_quotient;
@@ -72,16 +75,11 @@ impl U256 {
 					partial_quotient >>= 1.into();
                 }
                 else {
-					partial_quotient.words[0] = partial_quotient.words[0].wrapping_sub(1);
+					partial_quotient.words[0] -= 1;
 					partial_product -= divisor;
                 }
                 
             }
-
-			// print!("remainder: \t{:?}\t", remainder);
-			// // print!("- {:?}", partial_product);
-			// print!("cmp\t{:?}", divisor);
-			// print!("\n");
 
 			*remainder -= partial_product;
 			*quotient += partial_quotient;
@@ -273,10 +271,7 @@ impl ops::Rem<U256> for U256 {
 	fn rem(self, rhs: U256) -> Self::Output {
 		let mut rem = u256::ZERO;
 		let mut quo = u256::ZERO;
-		println!("Trying to compute remainder:");
-		println!("{:?} % {:?}\n", self, rhs);
 		U256::full_divide(self, rhs, &mut quo, &mut rem);
-		println!("Computed remainder: {:?}!", rem);
 		rem
 	}
 }
