@@ -37,7 +37,8 @@ pub struct BigInt {
 
 impl BigInt {
 
-	// until I figure out macro magic, these arrays will have to change with WORD_COUNT
+	// until I figure out macro magic, these arrays will have to change with 
+	// WORD_COUNT
 	pub const ZERO: BigInt = BigInt { words: [0, 0, 0, 0, 0, 0, 0, 0] };
 	pub const ONE: 	BigInt = BigInt { words: [1, 0, 0, 0, 0, 0, 0, 0] };
 
@@ -46,7 +47,8 @@ impl BigInt {
 	 */
 	pub fn to_le_bytes(self) -> [u8 ; BYTE_COUNT] {
 		let mut bytes: [u8 ; BYTE_COUNT] = [0 ; BYTE_COUNT];
-		let byte_lists: [[u8 ; WORD_BYTE_COUNT] ; WORD_COUNT] = self.words.map(|w| w.to_le_bytes());
+		let byte_lists: [[u8 ; WORD_BYTE_COUNT] ; WORD_COUNT] 
+			= self.words.map(|w| w.to_le_bytes());
 
 		for w in 0..WORD_COUNT {
 			for i in 0..WORD_BYTE_COUNT {
@@ -132,7 +134,9 @@ impl BigInt {
 				);
 
 				let word_str = std::str::from_utf8_unchecked(slice);
-				words[w] = Word::from_str_radix(word_str, 16).unwrap();
+				words[w] = Word::from_str_radix(
+					word_str, 16
+				).unwrap();
 			}
 		}
 		
@@ -217,13 +221,16 @@ impl BigInt {
             
             if *remainder.msw() >= *divisor.msw() {
                 *partial_quotient.lsw() = *remainder.msw() / *divisor.msw();
-				let shift_amount = ((remainder.size() as u32) - (self.size() as u32)) * Word::BITS;
+				let shift_amount = ((remainder.size() as u32) - 
+					(self.size() as u32)) * Word::BITS;
+
 				partial_quotient <<= Self::from(shift_amount.into());
             }
             else {
-				let shift_amount =
-					(((remainder.size() as u32) - (self.size() as u32)) * Word::BITS ) 
-					+ divisor.msw().leading_zeros() - remainder.msw().leading_zeros();
+				let shift_amount = (((remainder.size() as u32) 
+						- (self.size() as u32)) * Word::BITS ) 
+						+ divisor.msw().leading_zeros() 
+						- remainder.msw().leading_zeros();
 				
 				partial_quotient <<= BigInt::from(shift_amount.into());
             }
@@ -236,7 +243,8 @@ impl BigInt {
 					partial_quotient >>= Self::ONE;
                 }
                 else {
-					*partial_quotient.lsw() = partial_quotient.lsw().wrapping_sub(1);
+					let subtraction = partial_quotient.lsw().wrapping_sub(1);
+					*partial_quotient.lsw() = subtraction;
 					partial_product -= divisor;
                 }
             }
@@ -262,11 +270,14 @@ impl BigInt {
 	/// 
 	/// Computes self^power (mod m)
 	pub fn pow_mod(self, power: BigInt, m: BigInt) -> BigInt {
+		println!("{:?}^{:?} (mod {:?})", self, power, m);
 		// TODO: Make this double and add, could be way faster
 		if power == Self::ZERO {
 			Self::ONE
 		} else {
-			Self::mod_mul(self, self.pow_mod(power - Self::ONE, m), m)
+			Self::mod_mul(
+				self, self.pow_mod(power - Self::ONE, m), m
+			)
 		}
 
 		// I know this is painfully inefficient, I'm just doing it so that
@@ -289,7 +300,8 @@ impl BigInt {
 		((a % b) + (b % m).mod_add_inv(m)) % m
 	}
 
-	/// Computes the modular multiplicative inverse, with a certain prime modulus
+	/// Computes the modular multiplicative inverse, with a certain prime 
+	/// modulus
 	pub fn prime_mod_mul_inv(self, m: BigInt) -> BigInt {
 		self.pow_mod(m - Self::from(2), m)
 	}
@@ -363,7 +375,9 @@ impl Add<BigInt> for BigInt {
 		let mut words = [0 ; WORD_COUNT];
 
 		for i in 0..WORD_COUNT {
-			(words[i], carry) = self.words[i].carrying_add(rhs.words[i], carry);
+			(words[i], carry) = self.words[i].carrying_add(
+				rhs.words[i], carry
+			);
 		}
 
 		BigInt { words }
@@ -384,7 +398,9 @@ impl Sub<BigInt> for BigInt {
 		let mut words = [0 ; WORD_COUNT]; 
 
 		for i in 0..WORD_COUNT {
-			(words[i], borrow) = self.words[i].borrowing_sub(rhs.words[i], borrow);
+			(words[i], borrow) = self.words[i].borrowing_sub(
+				rhs.words[i], borrow
+			);
 		}
 
 		BigInt { words }
@@ -428,7 +444,9 @@ impl Mul<BigInt> for BigInt {
 			for j in 0..WORD_COUNT {
 				carry = 0;
 				for i in 0..(WORD_COUNT - j) {
-					(words[i + j], carry) = addmul(self[i], rhs[j], carry, words[i + j])
+					(words[i + j], carry) = addmul(
+						self[i], rhs[j], carry, words[i + j]
+					)
 				}
 			}
 
@@ -489,7 +507,8 @@ impl ShlAssign for BigInt {
 
         for i in (1..WORD_COUNT).rev() {
             self[i] <<= bitshift;
-            self[i] +=  match self[i - 1].checked_shl(Word::BITS - bitshift as u32) {
+			let partial = self[i - 1].checked_shl(Word::BITS - bitshift as u32);
+            self[i] +=  match partial {
 				Some(x) => x,
 				None => 0
 			};
@@ -525,7 +544,8 @@ impl ShrAssign for BigInt {
 
 		for i in 0..(WORD_COUNT - 1) {
             self[i] >>= bitshift;
-            self[i] += match self.words[i + 1].checked_shr(Word::BITS - bitshift as u32) {
+			let partial = self[i + 1].checked_shr(Word::BITS - bitshift as u32);
+            self[i] += match partial {
 				Some(x) => x,
 				None => 0
 			};

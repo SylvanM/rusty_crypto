@@ -35,4 +35,5 @@ fn test_mod_stuff() {
 	let b = BigInt::from(17);
 
 	assert_eq!(BigInt::mod_add(a, b, m), BigInt::ONE);
+	println!("{:?}", a.prime_mod_mul_inv(m));
 }
