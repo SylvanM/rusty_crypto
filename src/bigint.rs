@@ -12,25 +12,27 @@ use std::ops::{
 use std::cmp::{
 	Eq, PartialEq, PartialOrd, Ordering
 };
+use rand::Rng;
+use std::fmt::Debug;
 
 /// A "digit" in the little-endian representation of a `BigInt`
 type Word = u64;
 
 /// The number of words in a `BigInt`, each word of type `Word`
-const WORD_COUNT: usize = 8;
+pub const WORD_COUNT: usize = 8;
 
 /// The number of bits in the representation of a `BigInt`
-const BITS: u32 = (WORD_COUNT as u32) * Word::BITS;
+pub const BITS: u32 = (WORD_COUNT as u32) * Word::BITS;
 
 /// The number of bytes in the representation of a `BigInt`
-const BYTE_COUNT: usize = (BITS as usize) / 8;
+pub const BYTE_COUNT: usize = (BITS as usize) / 8;
 
 /// The number of butes in a word of a `BigInt`
-const WORD_BYTE_COUNT: usize = (Word::BITS / 8) as usize;
+pub const WORD_BYTE_COUNT: usize = (Word::BITS / 8) as usize;
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub struct BigInt {
-	words: [Word ; WORD_COUNT as usize]
+	pub words: [Word ; WORD_COUNT as usize]
 }
 
 impl BigInt {
@@ -53,6 +55,17 @@ impl BigInt {
 		}
 
 		bytes
+	}
+
+	/// Creates a random BigInt, NOT cryptographically secure, with `size`
+	/// random words.
+	pub fn rnd(size: usize) -> BigInt {
+		let mut rng = rand::thread_rng();
+		let mut words = [0; WORD_COUNT];
+		for i in 0..size {
+			words[i] = rng.gen::<Word>();
+		}
+		BigInt { words }
 	}
 
 	/**
@@ -104,9 +117,10 @@ impl BigInt {
 		let bytes = hex.as_bytes();
 		let mut padded = [b'0' ; BYTE_COUNT * 2];
 		let mut words = [0 ; WORD_COUNT];
+		let str_offset = padded.len() - bytes.len();
 
 		for i in (0..bytes.len()).rev() {
-			padded[i] = bytes[i];
+			padded[i + str_offset] = bytes[i];
 		}
 
 		for w in 0..WORD_COUNT {
@@ -131,10 +145,21 @@ impl BigInt {
 	pub fn to_hex_str(self) -> String {
 		if WORD_COUNT == 0 { "0".to_string() } else {
 			let mut string: String = "".to_string();
+			let mut before_nonzero = true;
 
-			for i in 0..WORD_COUNT {
+			for i in (0..WORD_COUNT).rev() {
+				if before_nonzero && self[i] == 0 { continue; }
+				
 				// this format string has to change based on WORD_BYTE_COUNT * 2
-				string += &format!("{:016X}", self.words[WORD_COUNT - i])[..];
+				// maybe use a macro here?
+
+				if before_nonzero {
+					string += &format!("0x{:X}", self.words[i])[..];
+				} else {
+					string += &format!("{:016X}", self.words[i])[..];
+				}
+
+				before_nonzero = false;
 			}
 
 			string
@@ -145,7 +170,7 @@ impl BigInt {
 	 * Accesses the most significant word of this `BigInt`
 	 */
 	fn msw(&mut self) -> &mut Word {
-		&mut self.words[self.size()]
+		&mut self.words[self.size() - 1]
 	}
 
 	/**
@@ -184,9 +209,10 @@ impl BigInt {
 			return (Self::ONE, Self::ZERO);
 		}
 
-        while remainder >= divisor {
+		let mut partial_product: BigInt;
 
-			let mut partial_product	= self;
+        while remainder >= divisor {
+			
         	let mut partial_quotient = Self::ONE;
             
             if *remainder.msw() >= *divisor.msw() {
@@ -199,7 +225,7 @@ impl BigInt {
 					(((remainder.size() as u32) - (self.size() as u32)) * Word::BITS ) 
 					+ divisor.msw().leading_zeros() - remainder.msw().leading_zeros();
 				
-				partial_product <<= BigInt::from(shift_amount.into());
+				partial_quotient <<= BigInt::from(shift_amount.into());
             }
 
 			partial_product = divisor * partial_quotient;
@@ -213,7 +239,6 @@ impl BigInt {
 					*partial_quotient.lsw() = partial_quotient.lsw().wrapping_sub(1);
 					partial_product -= divisor;
                 }
-                
             }
 
 			remainder -= partial_product;
@@ -280,6 +305,23 @@ impl BigInt {
 		Self::mod_mul(a, b.prime_mod_mul_inv(m), m)
 	}
 	
+}
+
+// -- Conversions --
+
+impl From<&str> for BigInt {
+	fn from(value: &str) -> Self {
+		BigInt::from_hex_str(value)
+	}
+}
+
+// -- Convenience -- 
+
+impl Debug for BigInt {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let str = self.to_hex_str();
+		write!(f, "{}", str)
+	}
 }
 
 // -- Indexing --
@@ -447,7 +489,10 @@ impl ShlAssign for BigInt {
 
         for i in (1..WORD_COUNT).rev() {
             self[i] <<= bitshift;
-            self[i] += self[i - 1] >> (Word::BITS - bitshift as u32);
+            self[i] +=  match self[i - 1].checked_shl(Word::BITS - bitshift as u32) {
+				Some(x) => x,
+				None => 0
+			};
         }
 
         self[0] <<= bitshift;
@@ -480,7 +525,10 @@ impl ShrAssign for BigInt {
 
 		for i in 0..(WORD_COUNT - 1) {
             self[i] >>= bitshift;
-            self[i] += self[i + 1] << (Word::BITS - bitshift as u32);
+            self[i] += match self.words[i + 1].checked_shr(Word::BITS - bitshift as u32) {
+				Some(x) => x,
+				None => 0
+			};
         }
 
         self[WORD_COUNT - 1] >>= bitshift;
