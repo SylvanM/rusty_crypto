@@ -30,6 +30,8 @@ pub const BYTE_COUNT: usize = (BITS as usize) / 8;
 /// The number of butes in a word of a `BigInt`
 pub const WORD_BYTE_COUNT: usize = (Word::BITS / 8) as usize;
 
+/// A big integer type for performing standard (and modular!) arithmetic on
+/// large values, intended to be used with implementing ECC on Curve25519.
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub struct BigInt {
 	pub words: [Word ; WORD_COUNT as usize]
@@ -37,14 +39,14 @@ pub struct BigInt {
 
 impl BigInt {
 
-	// until I figure out macro magic, these arrays will have to change with 
-	// WORD_COUNT
+	// until I figure out macro magic, these arrays will have to change manually
+	// with WORD_COUNT
 	pub const ZERO: BigInt = BigInt { words: [0, 0, 0, 0, 0, 0, 0, 0] };
 	pub const ONE: 	BigInt = BigInt { words: [1, 0, 0, 0, 0, 0, 0, 0] };
 
-	/**
-	 * Returns the little-endian byte representation of this `BigInt`
-	 */
+	///
+	/// Returns the little-endian byte representation of this `BigInt`
+	/// 
 	pub fn to_le_bytes(self) -> [u8 ; BYTE_COUNT] {
 		let mut bytes: [u8 ; BYTE_COUNT] = [0 ; BYTE_COUNT];
 		let byte_lists: [[u8 ; WORD_BYTE_COUNT] ; WORD_COUNT] 
@@ -59,7 +61,7 @@ impl BigInt {
 		bytes
 	}
 
-	/// Creates a random BigInt, NOT cryptographically secure, with `size`
+	/// Creates a random BigInt, *NOT* cryptographically secure, with `size`
 	/// random words.
 	pub fn rnd(size: usize) -> BigInt {
 		let mut rng = rand::thread_rng();
@@ -147,7 +149,8 @@ impl BigInt {
 	 * Writes a `BigInt` as a hex string, with no "0x" prefix
 	 */
 	pub fn to_hex_str(self) -> String {
-		if WORD_COUNT == 0 { "0".to_string() } else {
+		if self == Self::ZERO { "0x0".to_string() }
+		else if WORD_COUNT == 0 { "0x0".to_string() } else {
 			let mut string: String = "".to_string();
 			let mut before_nonzero = true;
 
@@ -206,36 +209,54 @@ impl BigInt {
 		let mut remainder = self;
 
 		if divisor > self { 
-			return (quotient, remainder);
+			return (Self::ZERO, self);
 		}
 
 		if divisor == self {
 			return (Self::ONE, Self::ZERO);
 		}
 
+		if divisor == Self::ONE {
+			return (self, Self::ZERO)
+		}
+
 		let mut partial_product: BigInt;
 
         while remainder >= divisor {
+
+			// println!("starting loop");
 			
         	let mut partial_quotient = Self::ONE;
             
             if *remainder.msw() >= *divisor.msw() {
+				println!("A");
                 *partial_quotient.lsw() = *remainder.msw() / *divisor.msw();
-				let shift_amount = ((remainder.size() as u32) - 
-					(self.size() as u32)) * Word::BITS;
+				let shift_amount = (remainder.size() - divisor.size()) as u32 * Word::BITS;
 
 				partial_quotient <<= Self::from(shift_amount.into());
             }
             else {
+				println!("B");
+				// println!("{:?} < {:?}", remainder.msw(), divisor.msw());
+				// println!("{:?} < {:?}", remainder.msw().leading_zeros(), divisor.msw().leading_zeros());
+				// println!("size diff: {}", ((remainder.size() as u32) - (divisor.size() as u32)));
+
 				let shift_amount = (((remainder.size() as u32) 
-						- (self.size() as u32)) * Word::BITS ) 
+						- (divisor.size() as u32)) * Word::BITS ) 
 						+ divisor.msw().leading_zeros() 
 						- remainder.msw().leading_zeros();
+
+				println!("shifting by {}", shift_amount);
 				
 				partial_quotient <<= BigInt::from(shift_amount.into());
+
+				println!("shifted to {:?}", partial_quotient);
             }
 
+			
 			partial_product = divisor * partial_quotient;
+			println!("{:?}\n{:?}", divisor, partial_quotient);
+			println!("{:?} <- partial product", partial_product);
             
             while partial_product > remainder {
                 if *partial_quotient.lsw() & 1 == 0 {
@@ -243,18 +264,18 @@ impl BigInt {
 					partial_quotient >>= Self::ONE;
                 }
                 else {
-					let subtraction = partial_quotient.lsw().wrapping_sub(1);
-					*partial_quotient.lsw() = subtraction;
+					*partial_quotient.lsw() -= 1;
 					partial_product -= divisor;
                 }
             }
 
+			println!("{:?}\n{:?}\n", remainder, partial_product);
 			remainder -= partial_product;
 			quotient += partial_quotient;
-            
+			// assert!(false);
         }
 
-		(remainder, quotient)
+		(quotient, remainder)
 	}
 
 	// -- Algorithms --
@@ -264,14 +285,27 @@ impl BigInt {
 		if a == Self::ZERO { b } else { Self::gcd(b % a, a) }
 	}
 
+	/// The Modular Extended Euclidean Algorithm
+	/// 
+	/// Computes `x`, `y`, and gcd(a, b) such that
+	/// 	ax + b = gcd(a, b) (mod m)
+	pub fn mod_ext_gcd(a: BigInt,  b: BigInt, m: BigInt) -> (BigInt, BigInt, BigInt) {
+		if a == Self::ZERO { 
+			(b, Self::ZERO, Self::ONE)
+		} else {
+			let (bda, bma) = Self::full_divide(b, a);
+			let (g, x1, y1) = Self::mod_ext_gcd(bma, a, m);
+			println!("a: {:?}, b: {:?}, m: {:?}", a, b, m);
+			(g, y1 - (bda * x1), x1)  
+		}
+	}
+
 	// -- Modular Operations --
 
 	/// Modular Exponentiation
 	/// 
 	/// Computes self^power (mod m)
 	pub fn pow_mod(self, power: BigInt, m: BigInt) -> BigInt {
-		println!("{:?}^{:?} (mod {:?})", self, power, m);
-		// TODO: Make this double and add, could be way faster
 		if power == Self::ZERO {
 			Self::ONE
 		} else {
@@ -279,13 +313,11 @@ impl BigInt {
 				self, self.pow_mod(power - Self::ONE, m), m
 			)
 		}
-
-		// I know this is painfully inefficient, I'm just doing it so that
-		// I can get something written so I can test it.
-		
 	}
 
 	/// Computes the modular additive inverse, with a certain modulus
+	/// 
+	/// Precondition: `self < m`
 	pub fn mod_add_inv(self, m: BigInt) -> BigInt {
 		m - self
 	}
@@ -300,21 +332,21 @@ impl BigInt {
 		((a % b) + (b % m).mod_add_inv(m)) % m
 	}
 
-	/// Computes the modular multiplicative inverse, with a certain prime 
-	/// modulus
-	pub fn prime_mod_mul_inv(self, m: BigInt) -> BigInt {
+	/// Computes the modular multiplicative inverse with a certain modulus
+	pub fn mod_mul_inv(self, m: BigInt) -> BigInt {
+		// match Self::mod_ext_gcd(self, m, m) { (_, x, _) => x }
 		self.pow_mod(m - Self::from(2), m)
 	}
 
 	/// Computes modular multiplication with a certain modulus
 	pub fn mod_mul(a: BigInt, b: BigInt, m: BigInt) -> BigInt {
-		((a % b) * (b % m)) % m
+		((a % m) * (b % m)) % m
 	}
 
 	/// Computes modular division via multiplication by inverse, with a 
 	/// prime modulus
 	pub fn mod_div(a: BigInt, b: BigInt, m: BigInt) -> BigInt {
-		Self::mod_mul(a, b.prime_mod_mul_inv(m), m)
+		Self::mod_mul(a, b.mod_mul_inv(m), m)
 	}
 	
 }
@@ -323,7 +355,13 @@ impl BigInt {
 
 impl From<&str> for BigInt {
 	fn from(value: &str) -> Self {
-		BigInt::from_hex_str(value)
+		Self::from_hex_str(value)
+	}
+}
+
+impl From<Word> for BigInt {
+	fn from(value: Word) -> Self {
+		Self::from(value)
 	}
 }
 
@@ -507,7 +545,7 @@ impl ShlAssign for BigInt {
 
         for i in (1..WORD_COUNT).rev() {
             self[i] <<= bitshift;
-			let partial = self[i - 1].checked_shl(Word::BITS - bitshift as u32);
+			let partial = self[i - 1].checked_shr(Word::BITS - bitshift as u32);
             self[i] +=  match partial {
 				Some(x) => x,
 				None => 0
@@ -544,7 +582,7 @@ impl ShrAssign for BigInt {
 
 		for i in 0..(WORD_COUNT - 1) {
             self[i] >>= bitshift;
-			let partial = self[i + 1].checked_shr(Word::BITS - bitshift as u32);
+			let partial = self[i + 1].checked_shl(Word::BITS - bitshift as u32);
             self[i] += match partial {
 				Some(x) => x,
 				None => 0

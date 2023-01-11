@@ -1,4 +1,5 @@
-use rusty_ecc::bigint::BigInt;
+use rusty_ecc::{bigint::BigInt, curve25519};
+
 
 #[test]
 fn test_bn_constructors() {
@@ -26,6 +27,10 @@ fn test_bn_simple() {
 	assert_eq!(pro_computed, pro_known);
 	assert_eq!(quo_computed, quo_known);
 	assert_eq!(rem_computed, rem_known);
+
+	let (div, rem) = BigInt::full_divide("7B428446BEA9CBC2F05FC6CC012888DDFD0B8B718FA83D4D9E6FE0791798729E4E35F3D056E0EAA72B8613826A118C2E3834358B31D0F8EA5504E3DBCB36E1".into(), curve25519::CURVE_MODULUS);
+	assert_eq!(div, "f685088d7d539785e0bf8d98025111bbfa1716e31f507a9b3cdfc0f22f30e5".into());
+	assert_eq!(rem, "309a159650a4152996d9bd95ca9615dd21c7eae86684ca126fd9a035d54bd7e0".into());
 }
 
 #[test]
@@ -34,6 +39,24 @@ fn test_mod_stuff() {
 	let a = BigInt::from(7);
 	let b = BigInt::from(17);
 
-	assert_eq!(BigInt::mod_add(a, b, m), BigInt::ONE);
-	println!("{:?}", a.prime_mod_mul_inv(m));
+	// test modular multiplication
+
+	println!("{:?}", BigInt::from(63) % m);
+	assert_eq!(BigInt::from(7) * 9.into(), 63.into());
+	assert_eq!(BigInt::mod_mul(7.into(), 9.into(), m), 17.into());
+
+	// Test modular exponentiation
+
+	assert_eq!(BigInt::pow_mod(2.into(), 3.into(), m), 8.into());
+	assert_eq!(BigInt::pow_mod(11.into(), 7.into(), m), 7.into());
+	assert_eq!(BigInt::pow_mod(2.into(), 4.into(), m), 16.into());
+	assert_eq!(BigInt::pow_mod(22.into(), 22.into(), m), 1.into());
+	assert_eq!(BigInt::pow_mod(a, b, m), 19.into());
+
+	// Test modular inverses
+
+	assert_eq!(BigInt::mod_div(a, a, m), BigInt::ONE);
+	assert_eq!(BigInt::mod_div(b, b, m), BigInt::ONE);
+
+
 }
