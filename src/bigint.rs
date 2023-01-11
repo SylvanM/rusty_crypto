@@ -37,6 +37,9 @@ pub struct BigInt {
 	pub words: [Word ; WORD_COUNT as usize]
 }
 
+/// This is just shorter notation if I want something to look more compact
+type BN = BigInt;
+
 impl BigInt {
 
 	// until I figure out macro magic, these arrays will have to change manually
@@ -189,7 +192,7 @@ impl BigInt {
 				return i + 1;
 			}
 		}
-		1
+		return 1
 	}
 
 	/**
@@ -224,39 +227,25 @@ impl BigInt {
 
         while remainder >= divisor {
 
-			// println!("starting loop");
-			
         	let mut partial_quotient = Self::ONE;
             
             if *remainder.msw() >= *divisor.msw() {
-				println!("A");
                 *partial_quotient.lsw() = *remainder.msw() / *divisor.msw();
-				let shift_amount = (remainder.size() - divisor.size()) as u32 * Word::BITS;
+				let shift_amount = (remainder.size() - divisor.size()) 
+					as u32 * Word::BITS;
 
 				partial_quotient <<= Self::from(shift_amount.into());
             }
             else {
-				println!("B");
-				// println!("{:?} < {:?}", remainder.msw(), divisor.msw());
-				// println!("{:?} < {:?}", remainder.msw().leading_zeros(), divisor.msw().leading_zeros());
-				// println!("size diff: {}", ((remainder.size() as u32) - (divisor.size() as u32)));
-
 				let shift_amount = (((remainder.size() as u32) 
 						- (divisor.size() as u32)) * Word::BITS ) 
 						+ divisor.msw().leading_zeros() 
 						- remainder.msw().leading_zeros();
-
-				println!("shifting by {}", shift_amount);
 				
 				partial_quotient <<= BigInt::from(shift_amount.into());
-
-				println!("shifted to {:?}", partial_quotient);
             }
-
 			
 			partial_product = divisor * partial_quotient;
-			println!("{:?}\n{:?}", divisor, partial_quotient);
-			println!("{:?} <- partial product", partial_product);
             
             while partial_product > remainder {
                 if *partial_quotient.lsw() & 1 == 0 {
@@ -269,10 +258,8 @@ impl BigInt {
                 }
             }
 
-			println!("{:?}\n{:?}\n", remainder, partial_product);
 			remainder -= partial_product;
 			quotient += partial_quotient;
-			// assert!(false);
         }
 
 		(quotient, remainder)
@@ -289,14 +276,16 @@ impl BigInt {
 	/// 
 	/// Computes `x`, `y`, and gcd(a, b) such that
 	/// 	ax + b = gcd(a, b) (mod m)
-	pub fn mod_ext_gcd(a: BigInt,  b: BigInt, m: BigInt) -> (BigInt, BigInt, BigInt) {
+	pub fn mod_ext_gcd(a: BN,  b: BN, m: BN) -> (BN, BN, BN) {
 		if a == Self::ZERO { 
 			(b, Self::ZERO, Self::ONE)
 		} else {
 			let (bda, bma) = Self::full_divide(b, a);
 			let (g, x1, y1) = Self::mod_ext_gcd(bma, a, m);
-			println!("a: {:?}, b: {:?}, m: {:?}", a, b, m);
-			(g, y1 - (bda * x1), x1)  
+			let product = Self::mod_mul(bda, x1, m);
+			let y = Self::mod_sub(y1, product, m);
+			// (g, y1 - (bda * x1), x1)  
+			(g, y, x1)
 		}
 	}
 
@@ -305,14 +294,20 @@ impl BigInt {
 	/// Modular Exponentiation
 	/// 
 	/// Computes self^power (mod m)
-	pub fn pow_mod(self, power: BigInt, m: BigInt) -> BigInt {
-		if power == Self::ZERO {
-			Self::ONE
-		} else {
-			Self::mod_mul(
-				self, self.pow_mod(power - Self::ONE, m), m
-			)
+	pub fn pow_mod(self, mut power: BigInt, m: BigInt) -> BigInt {
+		// if power == Self::ZERO {
+		// 	Self::ONE
+		// } else {
+		// 	Self::mod_mul(
+		// 		self, self.pow_mod(power - Self::ONE, m), m
+		// 	)
+		// }
+		let mut product = Self::ONE;
+		while power > Self::ZERO {
+			product = Self::mod_mul(self, product, m);
+			power -= 1.into();
 		}
+		product
 	}
 
 	/// Computes the modular additive inverse, with a certain modulus
@@ -329,13 +324,12 @@ impl BigInt {
 
 	/// Computes modular subtraction with a certain modulus
 	pub fn mod_sub(a: BigInt, b: BigInt, m: BigInt) -> BigInt {
-		((a % b) + (b % m).mod_add_inv(m)) % m
+		((a % m) + (b % m).mod_add_inv(m)) % m
 	}
 
 	/// Computes the modular multiplicative inverse with a certain modulus
 	pub fn mod_mul_inv(self, m: BigInt) -> BigInt {
-		// match Self::mod_ext_gcd(self, m, m) { (_, x, _) => x }
-		self.pow_mod(m - Self::from(2), m)
+		match Self::mod_ext_gcd(self, m, m) { (_, x, _) => x }
 	}
 
 	/// Computes modular multiplication with a certain modulus

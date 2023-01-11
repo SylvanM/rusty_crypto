@@ -1,3 +1,4 @@
+use rusty_ecc::curve25519::CURVE_MODULUS;
 use rusty_ecc::{bigint::BigInt, curve25519};
 
 
@@ -41,7 +42,6 @@ fn test_mod_stuff() {
 
 	// test modular multiplication
 
-	println!("{:?}", BigInt::from(63) % m);
 	assert_eq!(BigInt::from(7) * 9.into(), 63.into());
 	assert_eq!(BigInt::mod_mul(7.into(), 9.into(), m), 17.into());
 
@@ -57,6 +57,14 @@ fn test_mod_stuff() {
 
 	assert_eq!(BigInt::mod_div(a, a, m), BigInt::ONE);
 	assert_eq!(BigInt::mod_div(b, b, m), BigInt::ONE);
+
+	for _ in 0..99 {
+		let mut test_inv = BigInt::rnd(curve25519::KEY_BN_WORD_COUNT);
+		test_inv %= CURVE_MODULUS;
+		
+		let inv = test_inv.mod_mul_inv(CURVE_MODULUS);
+		assert_eq!(BigInt::mod_mul(test_inv, inv, CURVE_MODULUS), BigInt::ONE);
+	}
 
 
 }
