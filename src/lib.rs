@@ -1,5 +1,6 @@
 #![feature(bigint_helper_methods)]
+#![feature(slice_flatten)]
+#![feature(const_mut_refs)]
 
-pub mod u256;
-pub mod u256_ops;
-pub mod ed25519_num;
+pub mod bigint;
+pub mod curve25519;
