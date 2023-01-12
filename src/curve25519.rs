@@ -3,6 +3,7 @@ use std::cmp::{Eq, PartialEq, PartialOrd};
 use std::fmt::Debug;
 
 use crate::bigint::{BigInt, self, WORD_BYTE_COUNT};
+use crate::point::Point;
 
 const LE_25519_WORDS: [u64 ; bigint::WORD_COUNT] = [
 	0xffffffffffffffed, 0xffffffffffffffff, 
@@ -11,7 +12,28 @@ const LE_25519_WORDS: [u64 ; bigint::WORD_COUNT] = [
 	0x0000000000000000, 0x0000000000000000
 ];
 
+const LE_BASE_X_WORDS: [bigint::Word ; bigint::WORD_COUNT] = [
+	0xC9562D608F25D51A, 0x692CC7609525A7B2,
+	0xC0A4E231FDD6DC5C, 0x216936D3CD6E53FE,
+	0x0000000000000000, 0x0000000000000000,
+	0x0000000000000000, 0x0000000000000000
+];
+
+// -- Curve Constants --
+
+/// The modulus of the field
 pub const CURVE_MODULUS: BigInt = BigInt { words: LE_25519_WORDS };
+
+/// The `A` coefficient of Curve25519
+pub const ED25519_A: Curve25519Num = Curve25519Num { num: BigInt::from(486662)};
+
+/// The x coordinate of the base point of Curve25519
+pub const BASE_POINT_X: Curve25519Num = Curve25519Num { 
+	num: BigInt { words: LE_BASE_X_WORDS } 
+};
+
+/// The base point of Curve 25519
+pub const BASE_POINT: Point = Point::from(BASE_POINT_X.num);
 
 /// The number of bits in an ED25519 key
 pub const KEY_BIT_COUNT: usize = 256;
@@ -33,6 +55,9 @@ pub struct Curve25519Num {
 type CN = Curve25519Num;
 
 impl CN {
+
+	/// The number one as a `Curve25519Num`
+	pub const ONE: Curve25519Num =  Curve25519Num { num: BigInt::ONE };
 	
 	/// Returns the little-endian byte representation of this field element
 	pub fn to_le_bytes(self) -> [u8 ; bigint::BYTE_COUNT] {
@@ -81,6 +106,11 @@ impl CN {
 		CN { num: self.num.pow_mod(power, CURVE_MODULUS) }
 	}
 
+	/// Squares this number
+	pub fn squared(self) -> CN {
+		self.pow(2.into())
+	}
+
 }
 
 // -- Converstions -- 
@@ -88,6 +118,12 @@ impl CN {
 impl From<&str> for CN {
 	fn from(value: &str) -> Self {
 		CN { num: value.into() }
+	}
+}
+
+impl From<bigint::Word> for CN {
+	fn from(value: bigint::Word) -> Self {
+		CN { num: BigInt::from(value) }
 	}
 }
 

@@ -16,7 +16,7 @@ use rand::Rng;
 use std::fmt::Debug;
 
 /// A "digit" in the little-endian representation of a `BigInt`
-type Word = u64;
+pub type Word = u64;
 
 /// The number of words in a `BigInt`, each word of type `Word`
 pub const WORD_COUNT: usize = 8;
@@ -105,7 +105,7 @@ impl BigInt {
 	/**
 	 * Creates a `BigInt` from a big-endian sequence of bytes
 	 */
-	pub fn from_be_bytes(be_bytes: [u8 ; BYTE_COUNT]) -> BigInt {
+	pub fn from_be_bytes(be_bytes: [u8 ; BYTE_COUNT]) -> BN {
 		let mut words = unsafe { 
 			transmute::<[u8 ; BYTE_COUNT], [Word ; WORD_COUNT]>(be_bytes) 
 		};
