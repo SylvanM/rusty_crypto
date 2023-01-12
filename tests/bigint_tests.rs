@@ -1,5 +1,5 @@
-use rusty_ecc::curve25519::CURVE_MODULUS;
-use rusty_ecc::{bigint::BigInt, curve25519};
+use rusty_crypto::curve25519::CURVE_MODULUS;
+use rusty_crypto::{bigint::BigInt, curve25519};
 
 
 #[test]

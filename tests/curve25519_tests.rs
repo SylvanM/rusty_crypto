@@ -1,4 +1,4 @@
-use rusty_ecc::curve25519::Curve25519Num;
+use rusty_crypto::curve25519::Curve25519Num;
 
 #[test]
 fn test_basic_ops() {

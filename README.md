@@ -1,2 +1,2 @@
-# rusty_ecc
-An implementation of Elliptic Curve Cryptography (using Curve 25519) in Rust
+# rusty_crypto
+A simple cryptographic suite for Rust

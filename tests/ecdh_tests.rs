@@ -1,6 +1,6 @@
 /// Tests for the ECDH protocol
 #[cfg(test)]
-use rusty_ecc::{bigint::BigInt, ecdh};
+use rusty_crypto::{bigint::BigInt, ecdh};
 
 fn test_pubkey_helper(privkey_str: &str, known_pubkey_str: &str) {
 	let privkey: BigInt = privkey_str.into();
