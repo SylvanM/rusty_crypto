@@ -12,7 +12,8 @@ pub type ED25519Obj = [u8 ; curve25519::KEY_BYTE_COUNT];
 /// 
 /// Currenty **NOT** cryptographically secure
 pub fn gen_key() -> ED25519Obj {
-	todo!()
+	let num = BigInt::rnd(curve25519::KEY_BN_WORD_COUNT);
+	bn_to_obj(num)
 }
 
 /// Computes the public key for the given private key
@@ -35,18 +36,18 @@ pub fn compute_shared_secret(private: ED25519Obj, other_public: ED25519Obj) -> E
 // -- Internal Operations --
 
 /// Scales the base point by some value, computing the public key point
-fn compute_public_point(scalar: BigInt) -> Point {
+pub fn compute_public_point(scalar: BigInt) -> Point {
 	BASE_POINT * scalar
 }
 
 /// Computes the shared secret by scaling the other public key 
 /// by this party's private scalar
-fn compute_shared_secret_point(private: BigInt, other_public: Point) -> Point {
+pub fn compute_shared_secret_point(private: BigInt, other_public: Point) -> Point {
 	other_public * private
 }
 
 /// Converts a ED25519Obj to a BigInt
-fn obj_to_bn(obj: ED25519Obj) -> BigInt {
+pub fn obj_to_bn(obj: ED25519Obj) -> BigInt {
 	let mut bytes = [0 ; bigint::BYTE_COUNT];
 	for i in 0..KEY_BYTE_COUNT {
 		bytes[i] = obj[i];
