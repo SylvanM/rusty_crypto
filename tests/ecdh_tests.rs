@@ -39,7 +39,7 @@ fn test_ecdh_secret_sharing() {
 
 	// make sure that alice and bob do indeed generate the same shared secret
 
-	for i in 0..99 {
+	for _ in 0..99 {
 		let alice_priv = ecdh::gen_key();
 		let bob_priv = ecdh::gen_key();
 
@@ -49,13 +49,7 @@ fn test_ecdh_secret_sharing() {
 		let alice_secret = ecdh::compute_shared_secret(alice_priv, bob_pub);
 		let bob_secret   = ecdh::compute_shared_secret(bob_priv, alice_pub);
 
-		// this is just so we can see if we actually made it through the 
-		// loop at all (we didn't)
-		if alice_secret != bob_secret {
-			println!("Failed at test {}", i);
-			// redoing assertion to print out the values
-			assert_eq!(alice_secret, bob_secret);
-		}
+		assert_eq!(alice_secret, bob_secret);
 		
 	}
 
