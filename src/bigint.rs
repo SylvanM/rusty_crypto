@@ -7,7 +7,8 @@ use std::slice::from_raw_parts;
 use std::ops::{
 	Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Div, 
 	DivAssign, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, 
-	Index, IndexMut
+	Index, IndexMut, BitAndAssign, BitAnd, BitOrAssign, BitOr,
+	BitXorAssign, BitXor
 };
 use std::cmp::{
 	Eq, PartialEq, PartialOrd, Ordering
@@ -520,6 +521,62 @@ impl Rem<BigInt> for BigInt {
 impl RemAssign<BigInt> for BigInt {
 	fn rem_assign(&mut self, rhs: BigInt) {
 		(_, *self) = self.full_divide(rhs);
+	}
+}
+
+// -- Bitwise Operators -- 
+
+impl BitAndAssign for BigInt {
+	fn bitand_assign(&mut self, rhs: Self) {
+		for i in 0..WORD_COUNT {
+			self[i] &= rhs[i];
+		}
+	}
+}
+
+impl BitAnd for BigInt {
+	type Output = BigInt;
+
+	fn bitand(self, rhs: Self) -> Self {
+		let mut anded = self;
+		anded &= rhs;
+		anded
+	}
+}
+
+impl BitOrAssign for BigInt {
+	fn bitor_assign(&mut self, rhs: Self) {
+		for i in 0..WORD_COUNT {
+			self[i] |= rhs[i];
+		}
+	}
+}
+
+impl BitOr for BigInt {
+	type Output = BigInt;
+
+	fn bitor(self, rhs: Self) -> Self {
+		let mut anded = self;
+		anded |= rhs;
+		anded
+	}
+}
+
+impl BitXorAssign for BigInt {
+	fn bitxor_assign(&mut self, rhs: Self) {
+		for i in 0..WORD_COUNT {
+			self[i] ^= rhs[i];
+		}
+	}
+}
+
+impl BitXor for BigInt {
+	type Output = BigInt;
+
+	fn bitxor(self, rhs: Self) -> Self {
+		let mut anded = self;
+		anded ^= rhs;
+		anded
 	}
 }
 

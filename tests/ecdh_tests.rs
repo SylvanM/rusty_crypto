@@ -1,22 +1,37 @@
+use rusty_crypto::{curve25519::KEY_BYTE_COUNT};
 /// Tests for the ECDH protocol
 #[cfg(test)]
 use rusty_crypto::{bigint::BigInt, ecdh};
 
+// Takes a hex string of little-endian bytes and returns a BigInt from it
+fn le_str_to_bn(hex_str: &str) -> BigInt {
+	let be_num: BigInt = hex_str.into();
+	let be_bytes = be_num.to_le_bytes();
+	let mut le_bytes_trunc = [0 ; KEY_BYTE_COUNT];
+
+	for i in 1..=KEY_BYTE_COUNT {
+		le_bytes_trunc[i - 1] = be_bytes[KEY_BYTE_COUNT - i];
+	}
+
+	ecdh::obj_to_bn(le_bytes_trunc)
+}
+
 fn test_pubkey_helper(privkey_str: &str, known_pubkey_str: &str) {
-	let privkey: BigInt = privkey_str.into();
-	let known_pubkey: BigInt = known_pubkey_str.into();
 
-	let computed_public_key = ecdh::compute_public_point(privkey);
-	let computed_pubkey_crd = computed_public_key.affine_x().num;
+	let privkey = le_str_to_bn(privkey_str);
+	let known_pubkey = le_str_to_bn(known_pubkey_str);
 
-	assert_eq!(known_pubkey, computed_pubkey_crd);
+	let computed_pubkey = ecdh::compute_public_point(privkey).affine_x().num;
+
+	assert_eq!(known_pubkey, computed_pubkey);
+
 }
 
 #[test]
 fn test_pubkey_gen() {
 
 	// Test known public key computations
-	// these test cases were taken from https://asecuritysite.com/ecc/eddsa4
+	// RFC 8032 for test vectors for Ed25519
 
 	test_pubkey_helper(
 		"9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
