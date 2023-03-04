@@ -1,7 +1,7 @@
 /// 
 /// Elliptic Curve Diffie-Helmen secret sharing algorithm
 /// 
-use crate::{curve25519::{self, BASE_POINT, KEY_BYTE_COUNT}, point::Point, bigint::{BigInt, self}};
+use crate::{curve25519::{self, BASE_POINT, KEY_BYTE_COUNT}, point::Point, bigint::{BigInt, self}, sha512};
 
 /// A little endian byte array for a key or point value
 pub type ED25519Obj = [u8 ; curve25519::KEY_BYTE_COUNT];
@@ -13,7 +13,8 @@ pub type ED25519Obj = [u8 ; curve25519::KEY_BYTE_COUNT];
 /// Currenty **NOT** cryptographically secure
 pub fn gen_key() -> ED25519Obj {
 	let num = BigInt::rnd(curve25519::KEY_BN_WORD_COUNT);
-	bn_to_obj(num)
+	let obj = bn_to_obj(num);
+	sha512::ecdh_key_hash(obj)
 }
 
 /// Computes the public key for the given private key

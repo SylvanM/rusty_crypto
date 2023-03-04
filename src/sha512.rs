@@ -1,13 +1,33 @@
-use core::num::bignum::Big32x40;
+use std::mem::transmute;
 
-use crate::{ecdh::ED25519Obj, bigint::BigInt};
+use crate::{ecdh::ED25519Obj, curve25519::{KEY_BYTE_COUNT, KEY_BN_WORD_COUNT}};
 
 /// Implementation of SHA-512 specifically for ED25519
 
+/// The size, in bits, of a block for SHA-512
+const SHA_BLOCK_SIZE: usize = 1024;
+
+/// The size, in bytes, of a block for SHA-512
+const SHA_BLOCK_SIZE_BYTES: usize = SHA_BLOCK_SIZE / 8;
+
+/// The size, in 64-bit words, of a block for SHA-512
+const SHA_BLOCK_SIZE_WORDS: usize = SHA_BLOCK_SIZE / 64;
+
+/// The output digest size for SHA-512, in bits
+const SHA_OUTPUT_SIZE: usize = 512;
+
+/// The output digest size for SHA-512, in bytes
+const SHA_OUTPUT_SIZE_BYTES: usize = SHA_OUTPUT_SIZE / 8;
+
+/// The output digest size for SHA-512, in 64-bit words
+const SHA_OUTPUT_SIZE_WORDS: usize = SHA_OUTPUT_SIZE_BYTES / 8;
 
 /// A chunk of input that SHA works with, in this case 1024 bits as a 
 /// byte array
-pub type SHAChunk = [u8 ; 128];
+pub type SHABlock = [u64 ; SHA_BLOCK_SIZE_WORDS];
+
+/// A SHA-512 digest object
+pub type SHADigest = [u64 ; SHA_OUTPUT_SIZE_WORDS];
 
 // -- Magic Constants --
 
@@ -39,11 +59,99 @@ const K: [u64 ; 80] = [
 
 // -- SHA Algorithm --
 
-/// Hashes a single chunk of input into a BigInt 
-/// 
-/// A BigInt happens to be a very convenient choice of type, as it has 
-/// the exact size and structure that we want to see come out of this hash
-/// function.
-fn hash_chunk(chunk: SHAChunk) -> BigInt {
+const fn shr(x: u64, n: u32) -> u64 {
+	x.checked_shl(n).unwrap_or(0)
+}
+
+const fn rotr(x: u64, n: u32) -> u64 {
+	shr(x, n).overflowing_add(shr(x, 64 - n)).0
+}
+
+const fn sig1(x: u64) -> u64 {
+	shr(x, 6).overflowing_add(rotr(x, 61).overflowing_add(rotr(x, 19)).0).0
+}
+
+const fn sigt(x: u64) -> u64 {
+	shr(x, 7).overflowing_add(rotr(x, 8).overflowing_add(rotr(x, 1)).0).0
+}
+
+/// Hashes a single chunk of input into a BigInt
+pub fn hash_block(previous_digest: SHADigest, block: SHABlock) -> SHADigest {
+
+	let mut w = [0 ; 80];
+	let mut h = previous_digest;
+
+	for i in 0..SHA_BLOCK_SIZE_WORDS {
+		w[i] = block[i];
+	}
+
+	for i in SHA_BLOCK_SIZE_WORDS..80 {
+		w[i] = ((sig1(w[i - 1]).overflowing_add(w[i - 7]).0)
+				.overflowing_add(sigt(w[i - 15])).0)
+				.overflowing_add(w[i - 16]).0;
+	}
+
+	for i in 0..80 {
+		let ma = (h[0] & h[1]) ^ (h[0] & h[2]) ^ (h[1] & h[2]);
+		let mut ch = (h[4] & h[5]) ^ ((!h[4]) ^ h[6]);
+		let mut sa = (h[0] >> 2) ^ (h[0] >> 13) ^ (h[0] >> 22);
+		sa = sa.overflowing_add(ma).0;
+		ch = ch.overflowing_add(h[7]).0;
+		let se = (h[4] >> 6) ^ (h[4] >> 11) ^ (h[4] >> 25);
+		ch = ch.overflowing_add(se).0;
+		ch = ch.overflowing_add(w[i]).0;
+		ch = ch.overflowing_add(K[i]).0;
+		let ds = ch.overflowing_add(h[3]).0;
+		sa = sa.overflowing_add(ch).0;
+		h[7] = h[6];
+		h[6] = h[5];
+		h[5] = h[4];
+		h[4] = ds;
+		h[3] = h[2];
+		h[2] = h[1];
+		h[1] = h[0];
+		h[0] = sa;
+	}
+
+	h
+}
+
+/// Performs pre-processing on an `ED25519Obj` to convert it to a 
+/// `SHAChunk`
+pub fn format(obj: ED25519Obj) -> SHABlock {
+	let mut block = [0 ; SHA_BLOCK_SIZE_BYTES];
+
+	for i in 0..KEY_BYTE_COUNT {
+		block[i] = obj[i]
+	}
+
+	// place the padding `1` where it needs to be, the zeros are already 
+	// in place by default
+	block[KEY_BYTE_COUNT] = 1 << 7;
+
+	// the message size is 256 bits! that number can't fit in one byte,
+	// so we'll put a little 1 in the second to last byte.
+	// this may seem like I'm over-explaining, but seeing this line
+	// out of context may look a bit weird, so I'm more putting this in
+	// for my own sake.
+	block[SHA_BLOCK_SIZE_BYTES - 2] = 1;
+
+	unsafe { 
+		transmute::<[u8 ; SHA_BLOCK_SIZE_BYTES], SHABlock>(block)
+	}
+}
+
+/// Performs SHA-512 on a secret, returning the lower 512 bits of 
+/// the hash 
+pub fn ecdh_key_hash(obj: ED25519Obj) -> ED25519Obj {
+	let digest = &hash_block(H, format(obj));
+	let mut lower_digest = [0 ; KEY_BN_WORD_COUNT];
+
+	for i in 0..KEY_BN_WORD_COUNT {
+		lower_digest[i] = digest[i];
+	}
 	
+	unsafe {
+		transmute::<[u64 ; KEY_BN_WORD_COUNT], ED25519Obj>(lower_digest)
+	}
 }

@@ -20,6 +20,9 @@ use std::fmt::Debug;
 pub type Word = u64;
 
 /// The number of words in a `BigInt`, each word of type `Word`
+/// 
+/// Unless computers start having 128 x 128 -> 256 bit multiplication,
+/// this isn't going to change, and we're keeping Word = u64
 pub const WORD_COUNT: usize = 8;
 
 /// The number of bits in the representation of a `BigInt`
