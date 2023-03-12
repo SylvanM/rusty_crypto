@@ -97,7 +97,7 @@ fn speck128256_dec(key: Key, ciphertext: Block) -> Block {
 	let mut plaintext = ciphertext;
 
 	for i in (0..ROUNDS).rev() {
-		plaintext = speck128256_round_inv(ciphertext, keys[i]);
+		plaintext = speck128256_round_inv(plaintext, keys[i]);
 	}
 
 	plaintext
@@ -218,12 +218,29 @@ mod tests {
 	}
 
 	#[test]
+	fn test_inv_rounds() {
+
+		for i in (1..ROUNDS).rev() {
+			let round_pt = speck128256_round_inv(KNOWN_ROUND_RESULTS[i], KNOWN_KEY_SCHEDULE[i]);
+			assert_eq!(round_pt, KNOWN_ROUND_RESULTS[i - 1]);
+		}
+
+		let pt = speck128256_round_inv(KNOWN_ROUND_RESULTS[0], KNOWN_KEY_SCHEDULE[0]);
+		assert_eq!(pt, PT_WORDS);
+	}
+
+	#[test]
 	fn test_key_schedule() {
 		assert_eq!(speck128256_key_schedule(K_WORDS), KNOWN_KEY_SCHEDULE)
 	}
 
 	#[test]
-	fn test_speck() {
+	fn test_speck_enc() {
 		assert_eq!(speck128256_enc(K_WORDS, PT_WORDS), KNOWN_ROUND_RESULTS[ROUNDS - 1]);
+	}
+
+	#[test]
+	fn test_speck_dec() {
+		assert_eq!(speck128256_dec(K_WORDS, KNOWN_ROUND_RESULTS[ROUNDS - 1]), PT_WORDS);
 	}
 }
