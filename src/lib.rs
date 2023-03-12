@@ -6,3 +6,4 @@ pub mod bigint;
 pub mod curve25519;
 pub mod point;
 pub mod ecdh;
+pub mod speck;
