@@ -8,3 +8,4 @@ pub mod curve25519;
 pub mod point;
 pub mod ecdh;
 pub mod sha512;
+pub mod speck;
