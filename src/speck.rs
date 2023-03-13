@@ -1,11 +1,11 @@
 use std::mem::transmute;
 
-///
-/// The Speck algorithm designed by the NSA, with a word size of 64 bits, and a 
-/// key size of 4 words, so 256 bits.
-/// 
-/// Speck128/256
-///
+//
+// The Speck algorithm designed by the NSA, with a word size of 64 bits, and a 
+// key size of 4 words, so 256 bits.
+// 
+// Speck128/256
+//
 
 type Word = u64;
 type Block = [Word ; 2];
@@ -19,9 +19,9 @@ pub const BLOCK_SIZE: usize = 16;
 /// The size, in bytes, of a key
 pub const KEY_SIZE: usize = 32;
 
-/// 
-/// Speck encryption scheme
-/// 
+// 
+// Speck encryption scheme
+// 
 
 pub fn enc(pt: [u8 ; BLOCK_SIZE], k: [u8 ; KEY_SIZE]) -> [u8 ; BLOCK_SIZE] {
 	let block = bytes_to_block(pt);
