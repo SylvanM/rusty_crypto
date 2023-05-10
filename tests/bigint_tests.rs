@@ -1,6 +1,15 @@
-use rusty_crypto::curve25519::CURVE_MODULUS;
-use rusty_crypto::{bigint::BigInt, curve25519};
+// use rusty_crypto::curve25519::CURVE_MODULUS;
+use rusty_crypto::{bigint::BigInt};
+use rusty_crypto::bigint;
 
+const LE_25519_WORDS: [u64 ; bigint::WORD_COUNT] = [
+	0xffffffffffffffed, 0xffffffffffffffff, 
+	0xffffffffffffffff, 0x7fffffffffffffff,
+	0x0000000000000000, 0x0000000000000000,
+	0x0000000000000000, 0x0000000000000000
+];
+
+pub const CURVE_MODULUS: BigInt = BigInt { words: LE_25519_WORDS };
 
 #[test]
 fn test_bn_constructors() {
@@ -29,7 +38,7 @@ fn test_bn_simple() {
 	assert_eq!(quo_computed, quo_known);
 	assert_eq!(rem_computed, rem_known);
 
-	let (div, rem) = BigInt::full_divide("7B428446BEA9CBC2F05FC6CC012888DDFD0B8B718FA83D4D9E6FE0791798729E4E35F3D056E0EAA72B8613826A118C2E3834358B31D0F8EA5504E3DBCB36E1".into(), curve25519::CURVE_MODULUS);
+	let (div, rem) = BigInt::full_divide("7B428446BEA9CBC2F05FC6CC012888DDFD0B8B718FA83D4D9E6FE0791798729E4E35F3D056E0EAA72B8613826A118C2E3834358B31D0F8EA5504E3DBCB36E1".into(), CURVE_MODULUS);
 	assert_eq!(div, "f685088d7d539785e0bf8d98025111bbfa1716e31f507a9b3cdfc0f22f30e5".into());
 	assert_eq!(rem, "309a159650a4152996d9bd95ca9615dd21c7eae86684ca126fd9a035d54bd7e0".into());
 }
@@ -59,7 +68,7 @@ fn test_mod_stuff() {
 	assert_eq!(BigInt::mod_div(b, b, m), BigInt::ONE);
 
 	for _ in 0..99 {
-		let mut test_inv = BigInt::rnd(curve25519::KEY_BN_WORD_COUNT);
+		let mut test_inv = BigInt::rnd(4);
 		test_inv %= CURVE_MODULUS;
 		
 		let inv = test_inv.mod_mul_inv(CURVE_MODULUS);
