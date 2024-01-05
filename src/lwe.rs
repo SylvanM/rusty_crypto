@@ -193,7 +193,6 @@ pub fn gen<const M: usize, const N: usize, const Q: i64, const S: i64, const K: 
 	-> ([ZM<Q> ; N * K], [ZM<Q> ; M * (N + K)]) where [() ; N * K]: Sized, [() ; M * K]: Sized, [() ; M * N]: Sized {
 
 
-
 	// println!("GENERATING Key pair");
 	
 	// generate the secret, S
@@ -203,44 +202,17 @@ pub fn gen<const M: usize, const N: usize, const Q: i64, const S: i64, const K: 
 		s[i] = ZM::<Q>::rnd();
 	}
 
-	// println!("Generated S matrix:");
-
-	// for n in 0..N {
-	// 	for k in 0..K {
-	// 		print!("{:?}\t", s[index!(N, K, n, k)])
-	// 	}
-	// 	println!();
-	// }
-
 	// generate the public key A
 	let mut a = [0.into() ; M * N];
 
 	for i in 0..(M * N) {
 		a[i] = ZM::<Q>::rnd();
 	}
-
-	// println!("Generated A matrix:");
-
-	// for m in 0..M {
-	// 	for n in 0..N {
-	// 		print!("{:?}\t", a[index!(M, N, m, n)])
-	// 	}
-	// 	println!();
-	// }
-
+	
 	// Compute AS + E
 	let mut b = [0.into() ; M * K];
 
 	mat_mul_ptrs::<M, N, K, Q>(&a, &s, &mut b);
-
-	// println!("Computed Constants:");
-
-	// for m in 0..M {
-	// 	for k in 0..K {
-	// 		print!("{:?}\t", b[index!(M, K, m, k)]);
-	// 	}
-	// 	println!();
-	// }
 
 	let mut e = [0.into() ; M * K];
 	error_gen::<M, K, Q, S>(&mut e);
@@ -257,24 +229,6 @@ pub fn gen<const M: usize, const N: usize, const Q: i64, const S: i64, const K: 
 	// add the error to AS, and store it in the right-hand side of the public key
 	mat_add::<M, K, Q>(&b, &e, &mut pubkey[index!(M, N + K, 0, N)..index!(M, N + K, M, N + K - 1)]);
 
-	// println!("After Error Added:");
-
-	// for m in 0..M {
-	// 	for k in 0..K {
-	// 		print!("{:?}\t", pubkey[index!(M, N + K, m, N + k)]);
-	// 	}
-	// 	println!();
-	// }
-
-	// println!("Final Public Key:");
-
-	// for r in 0..M {
-	// 	for c in 0..(N + K) {
-	// 		print!("{:?}\t", pubkey[index!(M, N + K, r, c)]);
-	// 	}
-	// 	println!();
-	// }
-
 	(s, pubkey)
 
 }
@@ -282,21 +236,10 @@ pub fn gen<const M: usize, const N: usize, const Q: i64, const S: i64, const K: 
 pub fn enc<const M: usize, const N: usize, const Q: i64, const S: i64, const K: usize>(pubkey: [ZM<Q> ; M * (N + K)], m: [ZM<2> ; K]) -> [ZM<Q> ; K * (N + 1)] where [() ; K * M]: Sized, [() ; K * N]: Sized, [() ; K * (N + 1)]: Sized {
 	let mut t = [0.into() ; K * M];
 
-	// println!("ENCRYPTING now");
-
 	// generate selection matrix
 	for i in 0..(K * M) {
 		t[i] = ZM::<Q>::convert(ZM::<2>::rnd());
 	}
-
-	// println!("Generated selection matrix:");
-
-	// for r in 0..K {
-	// 	for c in 0..M {
-	// 		print!("{:?}\t", t[index!(K, M, r, c)]);
-	// 	}
-	// 	println!();
-	// }
 	
 	// we need to generate the rows of new summed equations
 
@@ -308,42 +251,16 @@ pub fn enc<const M: usize, const N: usize, const Q: i64, const S: i64, const K: 
 		vec_dot_prod_ptr::<K, M, Q>(&t, i, &pubkey[index!(M, N + K, 0, N + i)..index!(M, N + K, M, N + i)], &mut summed_eqs[index!(K, N + 1, i, N)]);
 	}
 
-	// println!("Result of summing:");
-
-	// for r in 0..K {
-	// 	for c in 0..(N + 1) {
-	// 		print!("{:?}\t", summed_eqs[index!(K, N + 1, r, c)]);
-	// 	}
-	// 	println!()
-	// }
 
 	// great! Now we add offsets to the constant terms as needed.
-
-	
-
 	let mut offsets = [0.into() ; K];
 	let proper_form = m.map(|x| x.val.into());
 
 	scalar_mul::<K, Q>((Q / 2).into(), &proper_form, &mut offsets);
 
-	// println!("We are encrypting the string: {:?}", m);
-	// println!("Offsets:");
-	// for i in 0..K {
-	// 	println!("{:?}", offsets[i]);
-	// }
-
 	for i in 0..K {
 		summed_eqs[index!(K, N + 1, i, N)] += offsets[i]
 	}
-
-	// println!("Final summed equations:");
-
-	// for r in 0..K {
-	// 	for c in 0..(N + 1) {
-	// 		print!("{:?}\t", summed_eqs[index!(K, N + 1, r, c)]);
-	// 	}
-	// 	println!()
-	// }
 
 	summed_eqs
 }
