@@ -3,6 +3,7 @@
 /// 
 
 use std::ops::*;
+use std::fmt::Debug;
 use rand::Rng;
 
 /// The field of the integers modulo a prime Q
@@ -11,9 +12,33 @@ pub struct ZM<const Q: i64> {
 	pub val: i64
 }
 
+impl<const Q: i64> Debug for ZM<Q> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		self.val.fmt(f)
+	}
+}
+
+impl<const Q: i64> PartialEq for ZM<Q> {
+	fn eq(&self, other: &Self) -> bool {
+		self.val == other.val
+	}
+
+	fn ne(&self, other: &Self) -> bool {
+		self.val != other.val
+	}
+}
+
 impl<const Q: i64> ZM<Q> {
 	pub fn rnd() -> ZM<Q> {
-		ZM::<Q> { val: rand::thread_rng().gen_range(1..Q) as i64 }
+		ZM::<Q> { val: rand::thread_rng().gen_range(0..Q) as i64 }
+	}
+
+	pub fn convert<const P: i64>(other: ZM<P>) -> ZM<Q> {
+		other.val.into()
+	}
+
+	pub fn from_int(x: i64) -> ZM<Q> {
+		x.into()
 	}
 }
 
