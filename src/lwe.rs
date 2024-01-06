@@ -281,7 +281,7 @@ fn dec<const M: usize, const N: usize, const Q: i64, const S: i64, const K: usiz
 fn test_lwe() {
 	// These are the same tests as before, but the one-bit versions
 	for _ in 1..=256 {
-		let (seckey, pubkey) = gen::<2, 20, 89, 5, 256>();
+		let (seckey, pubkey) = gen::<100, 30, 3329, 8, 256>();
 
 		// the plaintext!
 		let mut b = [0.into() ; 256];
@@ -290,8 +290,8 @@ fn test_lwe() {
 			b[i] = ZM::<2>::rnd();
 		}
 	
-		let ciphertext = enc::<2, 20, 89, 5, 256>(pubkey, b);
-		let decrypted = dec::<2, 20, 89, 5, 256>(seckey, ciphertext);
+		let ciphertext = enc::<100, 30, 3329, 8, 256>(pubkey, b);
+		let decrypted = dec::<100, 30, 3329, 8, 256>(seckey, ciphertext);
 
 		assert_eq!(b, decrypted);
 	}
