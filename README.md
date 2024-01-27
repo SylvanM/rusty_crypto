@@ -16,3 +16,6 @@ does this make sense? ...yeah right?
 
 So let's choose a HUGE Q, like Q=3329, so Q/4 is a little more than 800, so we'll say we need mS to be under 800
 we want m to be as big as possible, maybe say m=200, so we'll say S=4
+
+Lord have mercy this is inefficient! I now see the reason why people like to do this over polynomial rings instead
+of regular lattices.

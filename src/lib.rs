@@ -7,3 +7,4 @@ pub mod bigint;
 pub mod speck;
 pub mod lwe;
 pub mod algebra;
+pub mod utility;

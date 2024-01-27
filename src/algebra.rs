@@ -7,7 +7,7 @@ use std::fmt::Debug;
 use rand::Rng;
 
 /// The field of the integers modulo a prime Q
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct ZM<const Q: i64> {
 	pub val: i64
 }
@@ -45,6 +45,18 @@ impl<const Q: i64> ZM<Q> {
 impl<const Q: i64> From<i64> for ZM<Q> {
 	fn from(value: i64) -> Self {
 		ZM::<Q> { val: value.rem_euclid(Q) } 
+	}
+}
+
+impl<const Q: i64> From<u8> for ZM<Q> {
+	fn from(value: u8) -> Self {
+		ZM::<Q> { val: (value as i64).rem_euclid(Q) } 
+	}
+}
+
+impl<const Q: i64> From<i32> for ZM<Q> {
+	fn from(value: i32) -> Self {
+		ZM::<Q> { val: (value as i64).rem_euclid(Q) } 
 	}
 }
 

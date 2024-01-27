@@ -2,13 +2,54 @@
 // The basic Learning with Errors over integer lattices
 //
 
-use crate::algebra::*;
+use std::mem::transmute;
 
-use rand::{Rng, seq::index};
+use crate::algebra::*;
+use crate::utility::BigMappable;
+
+use rand::Rng;
+
+// -- Default parameters, chosen somewhat arbitrarily!
+
+pub const DEF_M: usize = 100;
+pub const DEF_N: usize = 30;
+pub const MODULUS: i64 = 3329;
+pub const ERROR: i64 = 8;
+pub const BIT_LENGTH: usize = 256;
 
 macro_rules! index {
 	($m: expr, $n: expr, $r: expr, $c: expr) => {
 		$c * $m + $r
+	};
+}
+
+macro_rules! get_bit {
+	($x: expr, $i: expr) => {
+		($x >> $i) & 1
+	};
+}
+
+
+// This is little endian!!!
+macro_rules! byte_to_bits {
+	($b: expr) => {
+		// TODO: Learn how Rust macros work to make this wayyyy more elegant
+		[
+			get_bit!($b, 0), get_bit!($b, 1),
+			get_bit!($b, 2), get_bit!($b, 3),
+			get_bit!($b, 4), get_bit!($b, 5),
+			get_bit!($b, 6), get_bit!($b, 7),
+		]
+	};
+}
+
+// little endian!
+macro_rules! bits_to_byte {
+	($bits: expr) => {
+		($bits[0].val << 0) + ($bits[1].val << 1) + 
+		($bits[2].val << 2) + ($bits[3].val << 3) + 
+		($bits[4].val << 4) + ($bits[5].val << 5) + 
+		($bits[6].val << 6) + ($bits[7].val << 7)
 	};
 }
 
@@ -189,8 +230,8 @@ fn test_lwe_bit() {
 
 }
 
-pub fn gen<const M: usize, const N: usize, const Q: i64, const S: i64, const K: usize>() 
-	-> ([ZM<Q> ; N * K], [ZM<Q> ; M * (N + K)]) where [() ; N * K]: Sized, [() ; M * K]: Sized, [() ; M * N]: Sized {
+fn gen_mat<const M: usize, const N: usize, const Q: i64, const S: i64, const K: usize>() 
+	-> ([ZM<Q> ; N * K], Box<[ZM<Q> ; M * (N + K)]>) where [() ; N * K]: Sized, [() ; M * K]: Sized, [() ; M * N]: Sized {
 
 
 	// println!("GENERATING Key pair");
@@ -229,11 +270,11 @@ pub fn gen<const M: usize, const N: usize, const Q: i64, const S: i64, const K: 
 	// add the error to AS, and store it in the right-hand side of the public key
 	mat_add::<M, K, Q>(&b, &e, &mut pubkey[index!(M, N + K, 0, N)..index!(M, N + K, M, N + K - 1)]);
 
-	(s, pubkey)
+	(s, Box::new(pubkey))
 
 }
 
-pub fn enc<const M: usize, const N: usize, const Q: i64, const S: i64, const K: usize>(pubkey: [ZM<Q> ; M * (N + K)], m: [ZM<2> ; K]) -> [ZM<Q> ; K * (N + 1)] where [() ; K * M]: Sized, [() ; K * N]: Sized, [() ; K * (N + 1)]: Sized {
+fn enc_mat<const M: usize, const N: usize, const Q: i64, const S: i64, const K: usize>(pubkey: Box<[ZM<Q> ; M * (N + K)]>, m: [ZM<2> ; K]) -> [ZM<Q> ; K * (N + 1)] where [() ; K * M]: Sized, [() ; K * N]: Sized, [() ; K * (N + 1)]: Sized {
 	let mut t = [0.into() ; K * M];
 
 	// generate selection matrix
@@ -254,7 +295,9 @@ pub fn enc<const M: usize, const N: usize, const Q: i64, const S: i64, const K: 
 
 	// great! Now we add offsets to the constant terms as needed.
 	let mut offsets = [0.into() ; K];
-	let proper_form = m.map(|x| x.val.into());
+
+	let proper_form = m.big_map(|x| x.val.into());
+	
 
 	scalar_mul::<K, Q>((Q / 2).into(), &proper_form, &mut offsets);
 
@@ -265,7 +308,7 @@ pub fn enc<const M: usize, const N: usize, const Q: i64, const S: i64, const K: 
 	summed_eqs
 }
 
-fn dec<const M: usize, const N: usize, const Q: i64, const S: i64, const K: usize>(seckey: [ZM<Q> ; N * K], cipher: [ZM<Q> ; K * (N + 1)]) -> [ZM<2> ; K] {
+fn dec_mat<const M: usize, const N: usize, const Q: i64, const S: i64, const K: usize>(seckey: [ZM<Q> ; N * K], cipher: [ZM<Q> ; K * (N + 1)]) -> [ZM<2> ; K] {
 	// we ONLY need to compute the diagonal of the product matrix.
 	let mut diffs = [0.into() ; K];
 
@@ -274,14 +317,14 @@ fn dec<const M: usize, const N: usize, const Q: i64, const S: i64, const K: usiz
 		diffs[i] = cipher[index!(K, N + 1, i, N)] - diffs[i];
 	}
 
-	diffs.map(|d| if (d.val > (Q / 4)) && (d.val < ((3 * Q) / 4)) { 1.into() } else { 0.into() })
+	diffs.big_map(|d| if (d.val > (Q / 4)) && (d.val < ((3 * Q) / 4)) { 1.into() } else { 0.into() })
 }
 
 #[test]
 fn test_lwe() {
 	// These are the same tests as before, but the one-bit versions
 	for _ in 1..=256 {
-		let (seckey, pubkey) = gen::<100, 30, 3329, 8, 256>();
+		let (seckey, pubkey) = gen_mat::<DEF_M, DEF_N, MODULUS, ERROR, BIT_LENGTH>();
 
 		// the plaintext!
 		let mut b = [0.into() ; 256];
@@ -290,9 +333,178 @@ fn test_lwe() {
 			b[i] = ZM::<2>::rnd();
 		}
 	
-		let ciphertext = enc::<100, 30, 3329, 8, 256>(pubkey, b);
-		let decrypted = dec::<100, 30, 3329, 8, 256>(seckey, ciphertext);
+		let ciphertext = enc_mat::<DEF_M, DEF_N, MODULUS, ERROR, BIT_LENGTH>(pubkey, b);
+		let decrypted = dec_mat::<DEF_M, DEF_N, MODULUS, ERROR, BIT_LENGTH>(seckey, ciphertext);
 
 		assert_eq!(b, decrypted);
+	}
+}
+
+// -- Now we get to actually exporting these algorithms into a usable form
+
+// [ZM<Q> ; M * (N + K)] pubkey
+// [ZM<Q> ; N * K] privkey
+
+/*
+ * Notes to myself:
+ * 
+ * We will represent the keys as byte arrays, 8 bytes for each i64, which will be turned into 
+ * the ZM<Q> later. So, the ZM<Q> array [1, 2, 3] would be 
+ * [0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1,
+ * 	0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x2,
+ * 	0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x3]
+ * 
+ * So, the number of bytes here is 8 * M * (N + K)!
+ */
+
+/// The public key for standard learning with errors
+pub type PublicKey = Box<[u8 ; 8 * DEF_M * (DEF_N + BIT_LENGTH)]>;
+
+/// The private key for learning with errors
+pub type SecretKey = [u8 ; 8 * DEF_N * BIT_LENGTH];
+
+/// The plaintext type, just 256 bits!
+/// 
+/// TODO: This is freaking huge and overloads the stack all too frequently.
+pub type Plaintext = [u8 ; BIT_LENGTH / 8];
+
+/// The ciphertext type
+pub type Ciphertext = [u8 ; 8 * BIT_LENGTH * (DEF_N + 1)];
+
+fn pk_to_matrix_rep(pubkey: PublicKey) -> Box<[ZM<MODULUS> ; DEF_M * (DEF_N + BIT_LENGTH)]> {
+	let thing = unsafe {
+		transmute::<PublicKey, Box<[i64 ; DEF_M * (DEF_N + BIT_LENGTH)]>>(pubkey)
+	}.big_map(|x| x.into());
+
+	Box::new(thing)
+}
+
+fn matrix_rep_to_pk(matrix: &Box<[ZM<MODULUS> ; DEF_M * (DEF_N + BIT_LENGTH)]>) -> PublicKey {
+	unsafe {
+		transmute::<Box<[i64 ; DEF_M * (DEF_N + BIT_LENGTH)]>, PublicKey>(Box::new(matrix.big_map(|x| x.val)))
+	}
+}
+
+fn sk_to_matrix_rep(secretkey: SecretKey) -> [ZM<MODULUS> ; DEF_N * BIT_LENGTH] {
+	unsafe {
+		transmute::<SecretKey, [i64 ; DEF_N * BIT_LENGTH]>(secretkey)
+	}.big_map(|x| x.into())
+}
+
+fn matrix_rep_to_sk(matrix: [ZM<MODULUS> ; DEF_N * BIT_LENGTH]) -> SecretKey {
+	unsafe {
+		transmute::<[i64 ; DEF_N * BIT_LENGTH], SecretKey>(matrix.big_map(|x| x.val))
+	}
+}
+
+fn pt_to_matrix_rep(plaintext: Plaintext) -> [ZM<2> ; BIT_LENGTH] {
+
+	let slice: [[ZM<2> ; 8] ; BIT_LENGTH / 8] = plaintext.big_map(|byte| 
+		byte_to_bits!(byte).map(|b| b.into())
+	);
+
+	let mut as_array = [0.into() ; BIT_LENGTH];
+
+	for i in 0..BIT_LENGTH {
+		as_array[i] = slice[i / 8][i % 8];
+	}
+
+	as_array
+}
+
+fn matrix_rep_to_pt(matrix: [ZM<2> ; BIT_LENGTH]) -> Plaintext {
+
+	let mut pt = [0 ; BIT_LENGTH / 8];
+
+	for i in 0..(BIT_LENGTH / 8) {
+		pt[i] = bits_to_byte!(matrix[(i * 8)..(i * 8 + 8)]) as u8
+	}
+
+	pt
+
+}
+
+fn ct_to_matrix_rep(ciphertext: Ciphertext) -> [ZM<MODULUS> ; BIT_LENGTH * (DEF_N + 1)] {
+	unsafe {
+		transmute::<Ciphertext, [i64 ; BIT_LENGTH * (DEF_N + 1)]>(ciphertext)
+	}.big_map(|x| x.into())
+}
+
+fn matrix_rep_to_ct(matrix: [ZM<MODULUS> ; BIT_LENGTH * (DEF_N + 1)]) -> Ciphertext {
+	unsafe {
+		transmute::<[i64 ; BIT_LENGTH * (DEF_N + 1)], Ciphertext>(matrix.big_map(|x| x.val))
+	}
+}
+
+#[test]
+fn test_conversions() {
+
+	println!("Testing conversions");
+	println!("Plaintext bits: {:?}", BIT_LENGTH);
+	println!("modulus={:?}, M={:?}, N={:?}, Err={:?}", MODULUS, DEF_M, DEF_N, ERROR);
+	println!("Public key size: {:?} bytes", 8 * DEF_M * (DEF_N + BIT_LENGTH));
+
+	for i in 1..=256 {
+
+		println!("Test {:?}", i);
+		
+		let (sk_mat, pk_mat) = gen_mat::<DEF_M, DEF_N, MODULUS, ERROR, BIT_LENGTH>();
+
+		let mut pt_mat = [0.into() ; BIT_LENGTH];
+
+		for i in 0..BIT_LENGTH {
+			pt_mat[i] = ZM::<2>::rnd();
+		}
+
+		// we are going to be generating a random ciphertext, instead of trying to encrypt soemthing!
+		// we aren't testing encryption, just conversion.
+		
+		// [ZM<MODULUS> ; BIT_LENGTH * (DEF_N + 1)]
+		let mut ct_mat = [0.into() ; BIT_LENGTH * (DEF_N + 1)];
+		for i in 0..(BIT_LENGTH * (DEF_N + 1)) {
+			ct_mat[i] = ZM::<MODULUS>::rnd();
+		}
+
+		assert_eq!(sk_mat, sk_to_matrix_rep(matrix_rep_to_sk(sk_mat)));
+		assert_eq!(pk_mat, pk_to_matrix_rep(matrix_rep_to_pk(&pk_mat)));
+		assert_eq!(pt_mat, pt_to_matrix_rep(matrix_rep_to_pt(pt_mat)));
+		assert_eq!(ct_mat, ct_to_matrix_rep(matrix_rep_to_ct(ct_mat)));
+
+	}
+}
+
+pub fn gen() -> (SecretKey, PublicKey) {
+	let (sk_mat, pk_mat) = gen_mat::<DEF_M, DEF_N, MODULUS, ERROR, BIT_LENGTH>();
+	(matrix_rep_to_sk(sk_mat), matrix_rep_to_pk(&pk_mat))
+}
+
+pub fn enc(pk: PublicKey, pt: Plaintext) -> Ciphertext {
+	matrix_rep_to_ct(enc_mat::<DEF_M, DEF_N, MODULUS, ERROR, BIT_LENGTH>(pk_to_matrix_rep(pk), pt_to_matrix_rep(pt)))
+}
+
+pub fn dec(sk: SecretKey, ct: Ciphertext) -> Plaintext {
+	matrix_rep_to_pt(dec_mat::<DEF_M, DEF_N, MODULUS, ERROR, BIT_LENGTH>(sk_to_matrix_rep(sk), ct_to_matrix_rep(ct)))
+}
+
+#[test]
+fn test_correctness() {
+	println!("Testing correctness");
+	println!("Plaintext bits: {:?}", BIT_LENGTH);
+	println!("modulus={:?}, M={:?}, N={:?}, Err={:?}", MODULUS, DEF_M, DEF_N, ERROR);
+	println!("Public key size: {:?} bytes", 8 * DEF_M * (DEF_N + BIT_LENGTH));
+
+	for i in 1..=256 {
+
+		println!("Test {:?}", i);
+
+		let (secret_key, public_key) = gen();
+
+		let plaintext: Plaintext = rand::thread_rng().gen::<[u8; 32]>();
+		
+		let encrypted = enc(public_key, plaintext);
+		let recovered = dec(secret_key, encrypted);
+
+		assert_eq!(plaintext, recovered);
+
 	}
 }
