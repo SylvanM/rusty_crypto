@@ -275,7 +275,7 @@ impl BigInt {
 	/// The Modular Extended Euclidean Algorithm
 	/// 
 	/// Computes `x`, `y`, and gcd(a, b) such that
-	/// 	ax + b = gcd(a, b) (mod m)
+	/// 	ax + by = gcd(a, b) (mod m)
 	pub fn mod_ext_gcd(a: BN,  b: BN, m: BN) -> (BN, BN, BN) {
 		if a == Self::ZERO { 
 			(b, Self::ZERO, Self::ONE)

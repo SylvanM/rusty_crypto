@@ -73,7 +73,7 @@ const fn speck128256_round(x: Block, round_key: u64) -> Block {
 	[xored, x[1].rotate_left(3) ^ xored]
 }
 
-const fn speck128256_round_inv(x: Block, round_key: u64) -> Block {
+const fn speck128256_round_inv(x: &Block, round_key: u64) -> Block {
 	let y = (x[0] ^ x[1]).rotate_right(3);
 	let x = (x[0] ^ round_key).wrapping_sub(y).rotate_left(8);
 	[x, y]
@@ -97,7 +97,7 @@ fn speck128256_dec(key: Key, ciphertext: Block) -> Block {
 	let mut plaintext = ciphertext;
 
 	for i in (0..ROUNDS).rev() {
-		plaintext = speck128256_round_inv(plaintext, keys[i]);
+		plaintext = speck128256_round_inv(&plaintext, keys[i]);
 	}
 
 	plaintext
@@ -221,11 +221,11 @@ mod tests {
 	fn test_inv_rounds() {
 
 		for i in (1..ROUNDS).rev() {
-			let round_pt = speck128256_round_inv(KNOWN_ROUND_RESULTS[i], KNOWN_KEY_SCHEDULE[i]);
+			let round_pt = speck128256_round_inv(&KNOWN_ROUND_RESULTS[i], KNOWN_KEY_SCHEDULE[i]);
 			assert_eq!(round_pt, KNOWN_ROUND_RESULTS[i - 1]);
 		}
 
-		let pt = speck128256_round_inv(KNOWN_ROUND_RESULTS[0], KNOWN_KEY_SCHEDULE[0]);
+		let pt = speck128256_round_inv(&KNOWN_ROUND_RESULTS[0], KNOWN_KEY_SCHEDULE[0]);
 		assert_eq!(pt, PT_WORDS);
 	}
 
