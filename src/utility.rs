@@ -1,4 +1,4 @@
-use std::{array, mem::transmute};
+// use std::{array, mem::transmute};
 
 ///
 /// A utility module, for trying to optimize some stuff that Rust hasn't quite

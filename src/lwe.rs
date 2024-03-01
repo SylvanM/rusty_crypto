@@ -5,6 +5,7 @@
 use std::mem::transmute;
 
 use crate::algebra::*;
+use crate::index;
 use crate::utility::BigMappable;
 
 use rand::Rng;
@@ -16,12 +17,6 @@ pub const DEF_N: usize = 30;
 pub const MODULUS: i64 = 3329;
 pub const ERROR: i64 = 8;
 pub const BIT_LENGTH: usize = 256;
-
-macro_rules! index {
-	($m: expr, $n: expr, $r: expr, $c: expr) => {
-		$c * $m + $r
-	};
-}
 
 macro_rules! get_bit {
 	($x: expr, $i: expr) => {
@@ -53,34 +48,6 @@ macro_rules! bits_to_byte {
 	};
 }
 
-/// Computes the dot product between the r-th row of the matrix x, and the vector y.
-/// 
-/// * `M` - 
-fn vec_dot_prod_ptr<const M: usize, const N: usize, const Q: i64>(x: &[ZM<Q>], r: usize, y: &[ZM<Q>], out: &mut ZM<Q>) {
-	*out = 0.into();
-	for i in 0..N {
-		*out += x[index!(M, N, r, i)] * y[i]
-	}
-}
-
-fn mat_vec_mul_ptr<const M: usize, const N: usize, const Q: i64>(a: &[ZM<Q>], vec: &[ZM<Q>], to_vec: &mut [ZM<Q>]) {
-	for r in 0..M {
-		vec_dot_prod_ptr::<M, N, Q>(a, r, vec, &mut to_vec[r]);
-	}
-}
-
-fn mat_add<const M: usize, const N: usize, const Q: i64>(a: &[ZM<Q>], b: &[ZM<Q>], out: &mut [ZM<Q>]) {
-	for i in 0..(M * N) {
-		out[i] = a[i] + b[i];
-	}
-}
-
-fn scalar_mul<const N: usize, const Q: i64>(k: ZM<Q>, v: &[ZM<Q>], out: &mut [ZM<Q>]) {
-	for i in 0..N {
-		out[i] = k * v[i];
-	}
-}
-
 /// Generates a random error for an M*N matrix vector in the intergers mod Q. Errors are generated so that 
 /// no subset sum of the errors will exceed one quarter of Q.
 fn error_gen<const M: usize, const N: usize, const Q: i64, const S: i64>(error: &mut [ZM<Q>]) {
@@ -88,46 +55,6 @@ fn error_gen<const M: usize, const N: usize, const Q: i64, const S: i64>(error: 
 	for i in 0..(M * N) {
 		error[i] = rand::thread_rng().gen_range(-S..=S).into();
 	}
-}
-
-#[test]
-fn test_mat_vec_mul_ptr() {
-	// test the super simple identity!
-	let identity = [1.into(), 0.into(), 0.into(), 1.into()];
-	let simple_vector = [3.into(), 7.into()];
-	let mut out_vector = [0.into() ; 2];
-	mat_vec_mul_ptr::<2, 2, 11>(&identity, &simple_vector, &mut out_vector);
-
-	assert_eq!(out_vector, simple_vector);
-
-	let mat = [3.into(), 2.into(), 5.into(), 1.into(), 7.into(), 0.into()];
-	let vec = [1.into(), 4.into(), 9.into()];
-	let mut out = [0.into() ; 2];
-	mat_vec_mul_ptr::<2, 3, 11>(&mat, &vec, &mut out);
-
-	assert_eq!(out, [9.into(), 6.into()]);
-
-}
-
-fn mat_mul_ptrs<const M: usize, const K: usize, const N: usize, const Q: i64>(a: &[ZM<Q>], b: &[ZM<Q>], out: &mut [ZM<Q>]) {
-	for c in 0..N {
-		mat_vec_mul_ptr::<M, K, Q>(a, 
-			&b[index!(K, N, 0, c)..index!(K, N, K, c)], 
-			&mut out[index!(M, N, 0, c)..index!(M, N, M, c)]
-		);
-	}
-}
-
-#[test]
-fn test_full_mat_mul() {
-	let a = [4.into(), 8.into(), 5.into(), 5.into(), 6.into(), 5.into(), 9.into(), 1.into(), 10.into(), 2.into(), 1.into(), 0.into()];
-	let b = [1.into(), 2.into(), 8.into(), 3.into(), 1.into(), 4.into(), 0.into(), 7.into()];
-
-	let mut prod = [0.into() ; 3 * 2];
-	mat_mul_ptrs::<3, 4, 2, 11>(&a, &b, &mut prod);
-	
-
-	assert_eq!(prod, [4.into(), 9.into(), 7.into(), 5.into(), 6.into(), 3.into()]);
 }
 
 /**
@@ -155,7 +82,7 @@ fn gen_bit<const M: usize, const N: usize, const Q: i64, const S: i64>() -> ([ZM
 
 	// compute b = As first
 
-	mat_mul_ptrs::<M, N, 1, Q>(&a, &s, &mut be);
+	mat_mul_ptrs::<M, N, 1, ZM<Q>>(&a, &s, &mut be);
 
 	// now add the error
 	let mut e: [ZM<Q> ; M] = [0.into() ; M];
@@ -192,7 +119,7 @@ fn enc_bit<const M: usize, const N: usize, const Q: i64, const S: i64>(pubkey: [
 		selections[r] = ZM::<2>::rnd().val.into();
 	}
 
-	mat_mul_ptrs::<1, M, {N + 1}, Q>(&selections, &pubkey, &mut new_eq);
+	mat_mul_ptrs::<1, M, {N + 1}, ZM<Q>>(&selections, &pubkey, &mut new_eq);
 
 	new_eq[N] += offset;
 
@@ -206,7 +133,7 @@ fn dec_bit<const M: usize, const N: usize, const Q: i64, const S: i64>(seckey: [
 	// plug in our secret s into the equation from Bob
 	let mut cp: ZM<Q> = 0.into();
 
-	vec_dot_prod_ptr::<1, N, Q>(&seckey, 0, &cipher, &mut cp);
+	vec_dot_prod_ptr::<1, N, ZM<Q>>(&seckey, 0, &cipher, &mut cp);
 
 	let diff = (cipher[N] - cp).val;
 
@@ -253,7 +180,7 @@ fn gen_mat<const M: usize, const N: usize, const Q: i64, const S: i64, const K: 
 	// Compute AS + E
 	let mut b = [0.into() ; M * K];
 
-	mat_mul_ptrs::<M, N, K, Q>(&a, &s, &mut b);
+	mat_mul_ptrs::<M, N, K, ZM<Q>>(&a, &s, &mut b);
 
 	let mut e = [0.into() ; M * K];
 	error_gen::<M, K, Q, S>(&mut e);
@@ -268,7 +195,7 @@ fn gen_mat<const M: usize, const N: usize, const Q: i64, const S: i64, const K: 
 	}
 
 	// add the error to AS, and store it in the right-hand side of the public key
-	mat_add::<M, K, Q>(&b, &e, &mut pubkey[index!(M, N + K, 0, N)..index!(M, N + K, M, N + K - 1)]);
+	mat_add::<M, K, ZM<Q>>(&b, &e, &mut pubkey[index!(M, N + K, 0, N)..index!(M, N + K, M, N + K - 1)]);
 
 	(s, Box::new(pubkey))
 
@@ -286,10 +213,10 @@ fn enc_mat<const M: usize, const N: usize, const Q: i64, const S: i64, const K: 
 
 	let mut summed_eqs = [0.into() ; K * (N + 1)]; // K equations, each for a bit, each with N coefficients.
 
-	mat_mul_ptrs::<K, M, N, Q>(&t, &pubkey[index!(M, N + K, 0, 0)..index!(M, N + K, M, N - 1)], &mut summed_eqs[index!(K, N + 1, 0, 0)..index!(K, N + 1, K, N - 1)]);
+	mat_mul_ptrs::<K, M, N, ZM<Q>>(&t, &pubkey[index!(M, N + K, 0, 0)..index!(M, N + K, M, N - 1)], &mut summed_eqs[index!(K, N + 1, 0, 0)..index!(K, N + 1, K, N - 1)]);
 
 	for i in 0..K {
-		vec_dot_prod_ptr::<K, M, Q>(&t, i, &pubkey[index!(M, N + K, 0, N + i)..index!(M, N + K, M, N + i)], &mut summed_eqs[index!(K, N + 1, i, N)]);
+		vec_dot_prod_ptr::<K, M, ZM<Q>>(&t, i, &pubkey[index!(M, N + K, 0, N + i)..index!(M, N + K, M, N + i)], &mut summed_eqs[index!(K, N + 1, i, N)]);
 	}
 
 
@@ -299,7 +226,7 @@ fn enc_mat<const M: usize, const N: usize, const Q: i64, const S: i64, const K: 
 	let proper_form = m.big_map(|x| x.val.into());
 	
 
-	scalar_mul::<K, Q>((Q / 2).into(), &proper_form, &mut offsets);
+	scalar_mul::<K, ZM<Q>>((Q / 2).into(), &proper_form, &mut offsets);
 
 	for i in 0..K {
 		summed_eqs[index!(K, N + 1, i, N)] += offsets[i]
@@ -313,7 +240,7 @@ fn dec_mat<const M: usize, const N: usize, const Q: i64, const S: i64, const K: 
 	let mut diffs = [0.into() ; K];
 
 	for i in 0..K {
-		vec_dot_prod_ptr::<K, N, Q>(&cipher[index!(K, N + 1, 0, 0)..index!(K, N + 1, K, N - 1)], i, &seckey[index!(N, K, 0, i)..index!(N, K, N, i)], &mut diffs[i]);
+		vec_dot_prod_ptr::<K, N, ZM<Q>>(&cipher[index!(K, N + 1, 0, 0)..index!(K, N + 1, K, N - 1)], i, &seckey[index!(N, K, 0, i)..index!(N, K, N, i)], &mut diffs[i]);
 		diffs[i] = cipher[index!(K, N + 1, i, N)] - diffs[i];
 	}
 
