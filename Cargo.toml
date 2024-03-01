@@ -2,6 +2,11 @@
 name = "rusty_crypto"
 version = "0.1.0"
 edition = "2021"
+license = "GPL-3.0-or-later"
+description = "A simple cryptographic suite for Rust"
+homepage = "https://github.com/SylvanM/rusty_crypto"
+repository = "https://github.com/SylvanM/rusty_crypto"
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
