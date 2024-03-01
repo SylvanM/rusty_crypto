@@ -3,6 +3,8 @@
 // Created by Sylvan Martin on Feb 26, 2024
 //
 
+// not sure why Rust thinks this isn't used... it very much is used,
+// and removing the import causes an error
 use rand::seq::IteratorRandom;
 
 use crate::{algebra::*, index};

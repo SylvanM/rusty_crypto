@@ -58,104 +58,111 @@ fn error_gen<const M: usize, const N: usize, const Q: i64, const S: i64>(error: 
 }
 
 /**
- * Generates a system of noisy equations to use as a public key for encrypting a single bit
+ * Important note to the Rust designers!!!
+ * 
+ * The following commented out code is never used, yet deleting the comment causes the compiler to panic.
+ * That's gotta be a compiler bug, yeah?
  */
-fn gen_bit<const M: usize, const N: usize, const Q: i64, const S: i64>() -> ([ZM<Q> ; N], [ZM<Q> ; M * (N + 1)]) where [(); M * N]: Sized {
+
+// /**
+//  * Generates a system of noisy equations to use as a public key for encrypting a single bit
+//  */
+// fn gen_bit<const M: usize, const N: usize, const Q: i64, const S: i64>() -> ([ZM<Q> ; N], [ZM<Q> ; M * (N + 1)]) where [(); M * N]: Sized {
 	
-	let mut s = [0.into(); N];
+// 	let mut s = [0.into(); N];
 
-	for i in 0..N {
-		s[i] = ZM::<Q>::rnd();
-	}
+// 	for i in 0..N {
+// 		s[i] = ZM::<Q>::rnd();
+// 	}
 	
-	let mut a: [ZM<Q> ; M * N] = [0.into(); M * N];
+// 	let mut a: [ZM<Q> ; M * N] = [0.into(); M * N];
 
-	for i in 0..M {
-		for j in 0..N {
-			a[index!(M, N, i, j)] = ZM::<Q>::rnd();
-		}
-	}
+// 	for i in 0..M {
+// 		for j in 0..N {
+// 			a[index!(M, N, i, j)] = ZM::<Q>::rnd();
+// 		}
+// 	}
 
-	// compute b = As + e
+// 	// compute b = As + e
 
-	let mut be: [ZM<Q> ; M] = [0.into() ; M];
+// 	let mut be: [ZM<Q> ; M] = [0.into() ; M];
 
-	// compute b = As first
+// 	// compute b = As first
 
-	mat_mul_ptrs::<M, N, 1, ZM<Q>>(&a, &s, &mut be);
+// 	mat_mul_ptrs::<M, N, 1, ZM<Q>>(&a, &s, &mut be);
 
-	// now add the error
-	let mut e: [ZM<Q> ; M] = [0.into() ; M];
-	error_gen::<M, 1, Q, S>(&mut e);
+// 	// now add the error
+// 	let mut e: [ZM<Q> ; M] = [0.into() ; M];
+// 	error_gen::<M, 1, Q, S>(&mut e);
 
-	let mut pubkey = [0.into() ; M * (N + 1)];
+// 	let mut pubkey = [0.into() ; M * (N + 1)];
 	
-	for r in 0..M {
-		for c in 0..N {
-			pubkey[index!(M, N + 1, r, c)] = a[index!(M, N, r, c)];
-		}
-	}
+// 	for r in 0..M {
+// 		for c in 0..N {
+// 			pubkey[index!(M, N + 1, r, c)] = a[index!(M, N, r, c)];
+// 		}
+// 	}
 
-	for r in 0..M {
-		pubkey[index!(M, N + 1, r, N)] = be[r];
-	}
+// 	for r in 0..M {
+// 		pubkey[index!(M, N + 1, r, N)] = be[r];
+// 	}
 
-	(s, pubkey)
+// 	(s, pubkey)
 
-}
+// }
 
-/**
- * Encrypts a bit 
- */
-fn enc_bit<const M: usize, const N: usize, const Q: i64, const S: i64>(pubkey: [ZM<Q> ; M * (N + 1)], bit: bool) -> [ZM<Q> ; N + 1] {
-	// add all the rows of the public key to create a new equation
+// /**
+//  * Encrypts a bit 
+//  */
+// fn enc_bit<const M: usize, const N: usize, const Q: i64, const S: i64>(pubkey: [ZM<Q> ; M * (N + 1)], bit: bool) -> [ZM<Q> ; N + 1] {
+// 	// add all the rows of the public key to create a new equation
 
-	let offset: ZM<Q> = if bit { (Q / 2).into() } else { 0.into() };
+// 	let offset: ZM<Q> = if bit { (Q / 2).into() } else { 0.into() };
 
-	let mut new_eq = [0.into() ; N + 1];
+// 	let mut new_eq = [0.into() ; N + 1];
 
-	let mut selections = [0.into() ; M];
-	for r in 0..M {
-		selections[r] = ZM::<2>::rnd().val.into();
-	}
+// 	let mut selections = [0.into() ; M];
+// 	for r in 0..M {
+// 		selections[r] = ZM::<2>::rnd().val.into();
+// 	}
 
-	mat_mul_ptrs::<1, M, {N + 1}, ZM<Q>>(&selections, &pubkey, &mut new_eq);
+// 	mat_mul_ptrs::<1, M, {N + 1}, ZM<Q>>(&selections, &pubkey, &mut new_eq);
 
-	new_eq[N] += offset;
+// 	new_eq[N] += offset;
 
-	new_eq
-}
+// 	new_eq
+// }
 
-/**
- * Decrypts a bit
- */
-fn dec_bit<const M: usize, const N: usize, const Q: i64, const S: i64>(seckey: [ZM<Q> ; N], cipher: [ZM<Q> ; N + 1]) -> bool {
-	// plug in our secret s into the equation from Bob
-	let mut cp: ZM<Q> = 0.into();
+// /**
+//  * Decrypts a bit
+//  */
+// fn dec_bit<const M: usize, const N: usize, const Q: i64, const S: i64>(seckey: [ZM<Q> ; N], cipher: [ZM<Q> ; N + 1]) -> bool {
+// 	// plug in our secret s into the equation from Bob
+// 	let mut cp: ZM<Q> = 0.into();
 
-	vec_dot_prod_ptr::<1, N, ZM<Q>>(&seckey, 0, &cipher, &mut cp);
+// 	vec_dot_prod_ptr::<1, N, ZM<Q>>(&seckey, 0, &cipher, &mut cp);
 
-	let diff = (cipher[N] - cp).val;
+// 	let diff = (cipher[N] - cp).val;
 
-	// if the difference is small, then we must have encrypted a zero
-	(diff > (Q / 4)) && (diff < ((3 * Q) / 4))
-}
+// 	// if the difference is small, then we must have encrypted a zero
+// 	(diff > (Q / 4)) && (diff < ((3 * Q) / 4))
+// }
 
-#[test]
-fn test_lwe_bit() {
+// #[test]
+// fn test_lwe_bit() {
 
-	for _ in 0..256 {
-		let (seckey, pubkey) = gen_bit::<10, 100, 89, 5>();
+// 	for _ in 0..256 {
+// 		let (seckey, pubkey) = gen_bit::<10, 100, 89, 5>();
 	
-		for b in [true, false] {
-			let ciphertext = enc_bit::<10, 100, 89, 5>(pubkey, b);
-			let _decrypted = dec_bit::<10, 100, 89, 5>(seckey, ciphertext);
+// 		for b in [true, false] {
+// 			let ciphertext = enc_bit::<10, 100, 89, 5>(pubkey, b);
+// 			let _decrypted = dec_bit::<10, 100, 89, 5>(seckey, ciphertext);
 
-			assert_eq!(_decrypted, b);
-		}
-	}
+// 			assert_eq!(_decrypted, b);
+// 		}
+// 	}
 
-}
+// }
 
 fn gen_mat<const M: usize, const N: usize, const Q: i64, const S: i64, const K: usize>() 
 	-> ([ZM<Q> ; N * K], Box<[ZM<Q> ; M * (N + K)]>) where [() ; N * K]: Sized, [() ; M * K]: Sized, [() ; M * N]: Sized {
