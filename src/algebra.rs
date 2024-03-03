@@ -101,7 +101,8 @@ impl<const Q: i64> Mul<ZM<Q>> for ZM<Q> {
 	type Output = ZM<Q>;
 
 	fn mul(self, rhs: ZM<Q>) -> ZM<Q> {
-		ZM::<Q> { val: ((((self.val % Q) as i128) * ((rhs.val % Q) as i128)) % (Q as i128)) as i64 }
+		let product = self.val.rem_euclid(Q) * rhs.val.rem_euclid(Q);
+		ZM::<Q> { val: product % Q }
 	}
 }
 
@@ -120,7 +121,7 @@ impl<const Q: i64> Ring for ZM<Q> {
 	}
 
 	fn rnd() -> ZM<Q> {
-		ZM::<Q> { val: StdRng::from_entropy().gen() }
+		ZM::<Q> { val: StdRng::from_entropy().gen::<i64>().rem_euclid(Q) }
 	}
 
 	fn power(self, n: i64) -> Self {

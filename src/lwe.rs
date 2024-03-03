@@ -58,19 +58,7 @@ fn error_gen<const M: usize, const N: usize, const Q: i64, const S: i64>(error: 
 
 	// naive implementation, where error elements are chosen in [-S, S]
 	for i in 0..(M * N) {
-
-		let mut e;
-
-		// rejection sampling to get a random value! This is slow, but secure.
-		loop {
-			e = rng.gen();
-
-			if (-S <= e) && (e <= S) {
-				break;
-			}
-		}
-
-		error[i] = e.into();
+		error[i] = rng.gen_range(-S..=S).into();
 	}
 }
 
