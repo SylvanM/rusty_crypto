@@ -4,7 +4,8 @@
 
 use std::{i64, ops::*};
 use std::fmt::Debug;
-use rand::Rng;
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 
 pub trait Ring: Copy + Sized + Add + AddAssign + Sub + SubAssign + Mul + MulAssign + Mul<Output = Self> + Add<Output = Self> {
  	const ONE: Self;
@@ -119,7 +120,7 @@ impl<const Q: i64> Ring for ZM<Q> {
 	}
 
 	fn rnd() -> ZM<Q> {
-		ZM::<Q> { val: rand::thread_rng().gen_range(0..Q) as i64 }
+		ZM::<Q> { val: StdRng::from_entropy().gen() }
 	}
 
 	fn power(self, n: i64) -> Self {

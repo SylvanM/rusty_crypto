@@ -8,7 +8,9 @@ use crate::algebra::*;
 use crate::index;
 use crate::utility::BigMappable;
 
+use rand::rngs::StdRng;
 use rand::Rng;
+use rand::SeedableRng;
 
 // -- Default parameters, chosen somewhat arbitrarily!
 
@@ -51,9 +53,24 @@ macro_rules! bits_to_byte {
 /// Generates a random error for an M*N matrix vector in the intergers mod Q. Errors are generated so that 
 /// no subset sum of the errors will exceed one quarter of Q.
 fn error_gen<const M: usize, const N: usize, const Q: i64, const S: i64>(error: &mut [ZM<Q>]) {
+
+	let mut rng = StdRng::from_entropy();
+
 	// naive implementation, where error elements are chosen in [-S, S]
 	for i in 0..(M * N) {
-		error[i] = rand::thread_rng().gen_range(-S..=S).into();
+
+		let mut e;
+
+		// rejection sampling to get a random value! This is slow, but secure.
+		loop {
+			e = rng.gen();
+
+			if (-S <= e) && (e <= S) {
+				break;
+			}
+		}
+
+		error[i] = e.into();
 	}
 }
 
