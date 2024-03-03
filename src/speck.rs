@@ -1,5 +1,7 @@
 use std::mem::transmute;
 
+use rand::{rngs::StdRng, Rng, SeedableRng};
+
 ///
 /// The Speck algorithm designed by the NSA, with a word size of 64 bits, and a 
 /// key size of 4 words, so 256 bits.
@@ -22,6 +24,10 @@ pub const KEY_SIZE: usize = 32;
 /// 
 /// Speck encryption scheme
 /// 
+
+pub fn gen() -> [u8 ; KEY_SIZE] {
+	StdRng::from_entropy().gen()
+}
 
 pub fn enc(pt: [u8 ; BLOCK_SIZE], k: [u8 ; KEY_SIZE]) -> [u8 ; BLOCK_SIZE] {
 	let block = bytes_to_block(pt);
@@ -143,7 +149,8 @@ fn speck128256_key_schedule(key: Key) -> [Word ; ROUNDS] {
 /// ^^that paper
 /// 
 #[cfg(test)]
-mod tests {
+mod tests {	
+
 	use super::*;
 
 	const PT_BYTES: [u8 ; 16] = [
@@ -194,6 +201,19 @@ mod tests {
 		[0x5d8c5aedd45e9e80, 0xa199a2f98daf4a78], [0x833c7c77c07bcd0e, 0x8ff16bbbad019ecb],
 		[0xde77ab6c5b37f913, 0xa1fcf6b1333b0f4f], [0x4109010405c0f53e, 0x4eeeb48d9c188f43]
 	];
+
+	#[test]
+	fn test_gen() {
+
+		for _ in 1..=10 {
+			let key = unsafe {
+				transmute::<[u8 ; KEY_SIZE], [u128 ; 2]>(gen())
+			};
+
+			println!("{:?}", key);
+		}
+		
+	}
 
 	#[test]
 	fn test_bytes_to_words() {
