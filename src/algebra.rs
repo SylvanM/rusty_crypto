@@ -101,7 +101,7 @@ impl<const Q: i64> Mul<ZM<Q>> for ZM<Q> {
 	type Output = ZM<Q>;
 
 	fn mul(self, rhs: ZM<Q>) -> ZM<Q> {
-		ZM::<Q> { val: (self.val * rhs.val) % Q }
+		ZM::<Q> { val: ((((self.val % Q) as i128) * ((rhs.val % Q) as i128)) % (Q as i128)) as i64 }
 	}
 }
 
