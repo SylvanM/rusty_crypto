@@ -8,4 +8,4 @@ pub mod speck;
 pub mod lwe;
 pub mod secsharing;
 pub mod algebra;
-mod utility;
+pub mod utility;
