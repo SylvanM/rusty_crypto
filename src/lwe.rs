@@ -14,12 +14,6 @@ use rand::SeedableRng;
 
 // -- Default parameters, chosen somewhat arbitrarily!
 
-pub const DEF_M: usize = 100;
-pub const DEF_N: usize = 30;
-pub const MODULUS: i64 = 3329;
-pub const ERROR: i64 = 8;
-pub const BIT_LENGTH: usize = 256;
-
 macro_rules! get_bit {
 	($x: expr, $i: expr) => {
 		($x >> $i) & 1
@@ -296,19 +290,35 @@ fn test_lwe() {
  * So, the number of bytes here is 8 * M * (N + K)!
  */
 
-/// The public key for standard learning with errors
-pub type PublicKey = Box<[u8 ; 8 * DEF_M * (DEF_N + BIT_LENGTH)]>;
+const DEF_M: usize = 100;
+const DEF_N: usize = 30;
+const MODULUS: i64 = 3329;
+const ERROR: i64 = 8;
+const BIT_LENGTH: usize = 256;
 
-/// The private key for learning with errors
-pub type SecretKey = [u8 ; 8 * DEF_N * BIT_LENGTH];
+/// The length, in bytes, of the public key
+pub const PUBKEY_LEN: usize = 8 * DEF_M * (DEF_N + BIT_LENGTH);
+
+/// The length, in bytes, of the secret key
+pub const SECKEY_LEN: usize = 8 * DEF_N * BIT_LENGTH;
+
+/// The length, in bytes, of the plaintext
+pub const PLAINTEXT_LEN: usize = BIT_LENGTH / 8;
+
+/// The length, in bytes, of the ciphertext
+pub const CIPHERTEXT_LEN: usize = 8 * BIT_LENGTH * (DEF_N + 1);
+
+/// The public key type for standard learning with errors
+pub type PublicKey = Box<[u8 ; PUBKEY_LEN]>;
+
+/// The private key type for learning with errors
+pub type SecretKey = [u8 ; SECKEY_LEN];
 
 /// The plaintext type, just 256 bits!
-/// 
-/// TODO: This is freaking huge and overloads the stack all too frequently.
-pub type Plaintext = [u8 ; BIT_LENGTH / 8];
+pub type Plaintext = [u8 ; PLAINTEXT_LEN];
 
 /// The ciphertext type
-pub type Ciphertext = [u8 ; 8 * BIT_LENGTH * (DEF_N + 1)];
+pub type Ciphertext = [u8 ; CIPHERTEXT_LEN];
 
 fn pk_to_matrix_rep(pubkey: PublicKey) -> Box<[ZM<MODULUS> ; DEF_M * (DEF_N + BIT_LENGTH)]> {
 	let thing = unsafe {
