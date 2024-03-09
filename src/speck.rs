@@ -9,9 +9,9 @@ use rand::{rngs::StdRng, Rng, SeedableRng};
 /// Speck128/256
 ///
 
-type Word = u64;
-type Block = [Word ; 2];
-type Key = [Word ; 4];
+pub type Word = u64;
+pub type Block = [Word ; 2];
+pub type Key = [Word ; 4];
 
 const ROUNDS: usize = 34;
 
