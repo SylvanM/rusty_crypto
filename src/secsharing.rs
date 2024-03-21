@@ -7,6 +7,8 @@
 // and removing the import causes an error
 // use rand::seq::IteratorRandom;
 
+use rand::seq::IteratorRandom;
+
 use crate::{algebra::*, index};
 
 // -- Shamir Secret Sharing --

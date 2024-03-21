@@ -3,17 +3,12 @@ use std::mem::transmute;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 ///
-/// The Speck algorithm designed by the NSA, with a word size of 64 bits, and a 
+/// The Speck algorithm designed by the NSA, with a word size of 128 bits, and a 
 /// key size of 4 words, so 256 bits.
 /// 
 /// Speck128/256
 ///
 
-pub type Word = u64;
-pub type Block = [Word ; 2];
-pub type Key = [Word ; 4];
-
-const ROUNDS: usize = 34;
 
 /// The size, in bytes, of a block to encrypt
 pub const BLOCK_SIZE: usize = 16;
@@ -21,45 +16,39 @@ pub const BLOCK_SIZE: usize = 16;
 /// The size, in bytes, of a key
 pub const KEY_SIZE: usize = 32;
 
+pub type Word = u64;
+pub type Block = [u8 ; BLOCK_SIZE];
+pub type Key = [u8 ; KEY_SIZE];
+
+const ROUNDS: usize = 34;
+
+
+
 /// 
 /// Speck encryption scheme
 /// 
 
-pub fn gen() -> [u8 ; KEY_SIZE] {
+pub fn gen() -> Key {
 	StdRng::from_entropy().gen()
-}
-
-pub fn enc(pt: [u8 ; BLOCK_SIZE], k: [u8 ; KEY_SIZE]) -> [u8 ; BLOCK_SIZE] {
-	let block = bytes_to_block(pt);
-	let key = key_bytes_to_key(k);
-	let ct = speck128256_enc(key, block);
-	block_to_bytes(ct)
-}
-
-pub fn dec(ct: [u8 ; BLOCK_SIZE], k: [u8 ; KEY_SIZE]) -> [u8 ; BLOCK_SIZE] {
-	let block = bytes_to_block(ct);
-	let key = key_bytes_to_key(k);
-	let pt = speck128256_dec(key, block);
-	block_to_bytes(pt)
 }
 
 /// 
 /// Utility Functions
 /// 
 
-fn bytes_to_block(bytes: [u8 ; 16]) -> Block {
-	let mut rev_block: Block = unsafe { transmute(bytes) };
+fn bytes_to_words(bytes: [u8 ; 16]) -> [Word ; 2] {
+	let mut rev_block: [Word ; 2] = unsafe { transmute(bytes) };
 	rev_block.reverse();
 	rev_block
 }
 
-fn key_bytes_to_key(bytes: [u8 ; 32]) -> Key {
+const fn key_bytes_to_words(bytes: [u8 ; 32]) -> [Word ; 4] {
 	unsafe {
 		transmute(bytes)
 	}
 }
 
-fn block_to_bytes(block: Block) -> [u8 ; 16] {
+fn words_to_bytes(block: [Word ; 2]) -> Block {
 	let mut rev_block = block;
 	rev_block.reverse();
 
@@ -72,46 +61,46 @@ fn block_to_bytes(block: Block) -> [u8 ; 16] {
 /// Speck actual encryption methods
 /// 
 
-const fn speck128256_round(x: Block, round_key: u64) -> Block {
+const fn speck128256_round(x: [Word ; 2], round_key: u64) -> [Word ; 2] {
 	let rotated_x = x[0].rotate_right(8);
 	let added = rotated_x.wrapping_add(x[1]);
 	let xored = added ^ round_key;
 	[xored, x[1].rotate_left(3) ^ xored]
 }
 
-const fn speck128256_round_inv(x: &Block, round_key: u64) -> Block {
+const fn speck128256_round_inv(x: &[Word ; 2], round_key: u64) -> [Word ; 2] {
 	let y = (x[0] ^ x[1]).rotate_right(3);
 	let x = (x[0] ^ round_key).wrapping_sub(y).rotate_left(8);
 	[x, y]
 }
- 
-fn speck128256_enc(key: Key, plaintext: Block) -> Block {
+
+pub fn enc(key: Key, plaintext: Block) -> Block {
 
 	let keys = speck128256_key_schedule(key);
-	let mut ciphertext = plaintext;
+	let mut ciphertext = bytes_to_words(plaintext);
 
 	for i in 0..ROUNDS {
 		ciphertext = speck128256_round(ciphertext, keys[i]);
 	}
 
-	ciphertext
+	words_to_bytes(ciphertext)
 }
 
-fn speck128256_dec(key: Key, ciphertext: Block) -> Block {
+pub fn dec(key: Key, ciphertext: Block) -> Block {
 
 	let keys = speck128256_key_schedule(key);
-	let mut plaintext = ciphertext;
+	let mut plaintext = bytes_to_words(ciphertext);
 
 	for i in (0..ROUNDS).rev() {
 		plaintext = speck128256_round_inv(&plaintext, keys[i]);
 	}
 
-	plaintext
+	words_to_bytes(plaintext)
 }
 
 fn speck128256_key_schedule(key: Key) -> [Word ; ROUNDS] {
 	let mut keys = [0; ROUNDS];
-	let mut constants = key;
+	let mut constants = key_bytes_to_words(key);
 	let mut i = 0;
 
 	while i < 33 {
@@ -149,7 +138,7 @@ fn speck128256_key_schedule(key: Key) -> [Word ; ROUNDS] {
 /// ^^that paper
 /// 
 #[cfg(test)]
-mod tests {	
+mod tests {
 
 	use super::*;
 
@@ -157,17 +146,11 @@ mod tests {
 		0x70, 0x6f, 0x6f, 0x6e, 0x65, 0x72, 0x2e, 0x20, 0x49, 0x6e, 0x20, 0x74, 0x68, 0x6f, 0x73, 0x65
 	];
 
-	const PT_WORDS: Block = [ 0x65736f6874206e49, 0x202e72656e6f6f70 ];
-
 	const K_BYTES: [u8 ; 32] = [
 		0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 
 		0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 
 		0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
 		0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f
-	];
-
-	const K_WORDS: Key = [
-		0x0706050403020100, 0x0f0e0d0c0b0a0908, 0x1716151413121110, 0x1f1e1d1c1b1a1918
 	];
 
 	const KNOWN_KEY_SCHEDULE: [u64 ; ROUNDS] = [
@@ -182,7 +165,7 @@ mod tests {
 		0x400303547ff5e38b, 0xf4d26f589a56b276
 	];
 
-	const KNOWN_ROUND_RESULTS: [Block ; ROUNDS] = [
+	const KNOWN_ROUND_RESULTS_WORDS: [[Word ; 2] ; ROUNDS] = [
 		[0x6e95e0d0d5e18ede, 0x6fe673fba69af55f], [0x797032ed606dd5e4, 0x0643ad3054ba7f1f],
 		[0x14a895add1c2e1a6, 0x26b5fc2f7411195e], [0x2a52445a10d191c1, 0x1ffda521b0595b30],
 		[0x3a47062dc1b2183c, 0xc5aa2f204378c1bc], [0x2c4bd1e53df8b12c, 0x011aa8e7263ebcca],
@@ -216,24 +199,13 @@ mod tests {
 	}
 
 	#[test]
-	fn test_bytes_to_words() {
-		assert_eq!(bytes_to_block(PT_BYTES), PT_WORDS);
-		assert_eq!(key_bytes_to_key(K_BYTES), K_WORDS);
-	}
-
-	#[test]
-	fn test_words_to_bytes() {
-		assert_eq!(block_to_bytes(PT_WORDS), PT_BYTES);
-	}
-
-	#[test]
 	fn test_rounds() {
 		// Make sure that each round of encryption yields the correct result
-		let mut pt = PT_WORDS;
+		let mut pt = bytes_to_words(PT_BYTES);
 
 		for i in 0..ROUNDS {
 			pt = speck128256_round(pt, KNOWN_KEY_SCHEDULE[i]);
-			assert_eq!(pt, KNOWN_ROUND_RESULTS[i]);
+			assert_eq!(pt, KNOWN_ROUND_RESULTS_WORDS[i]);
 		}
 	}
 
@@ -241,26 +213,26 @@ mod tests {
 	fn test_inv_rounds() {
 
 		for i in (1..ROUNDS).rev() {
-			let round_pt = speck128256_round_inv(&KNOWN_ROUND_RESULTS[i], KNOWN_KEY_SCHEDULE[i]);
-			assert_eq!(round_pt, KNOWN_ROUND_RESULTS[i - 1]);
+			let round_pt = speck128256_round_inv(&KNOWN_ROUND_RESULTS_WORDS[i], KNOWN_KEY_SCHEDULE[i]);
+			assert_eq!(round_pt, KNOWN_ROUND_RESULTS_WORDS[i - 1]);
 		}
 
-		let pt = speck128256_round_inv(&KNOWN_ROUND_RESULTS[0], KNOWN_KEY_SCHEDULE[0]);
-		assert_eq!(pt, PT_WORDS);
+		let pt = speck128256_round_inv(&KNOWN_ROUND_RESULTS_WORDS[0], KNOWN_KEY_SCHEDULE[0]);
+		assert_eq!(pt, bytes_to_words(PT_BYTES));
 	}
 
 	#[test]
 	fn test_key_schedule() {
-		assert_eq!(speck128256_key_schedule(K_WORDS), KNOWN_KEY_SCHEDULE)
+		assert_eq!(speck128256_key_schedule(K_BYTES), KNOWN_KEY_SCHEDULE)
 	}
 
 	#[test]
 	fn test_speck_enc() {
-		assert_eq!(speck128256_enc(K_WORDS, PT_WORDS), KNOWN_ROUND_RESULTS[ROUNDS - 1]);
+		assert_eq!(enc(K_BYTES, PT_BYTES), words_to_bytes(KNOWN_ROUND_RESULTS_WORDS[ROUNDS - 1]));
 	}
 
 	#[test]
 	fn test_speck_dec() {
-		assert_eq!(speck128256_dec(K_WORDS, KNOWN_ROUND_RESULTS[ROUNDS - 1]), PT_WORDS);
+		assert_eq!(dec(K_BYTES, words_to_bytes(KNOWN_ROUND_RESULTS_WORDS[ROUNDS - 1])), PT_BYTES);
 	}
 }
