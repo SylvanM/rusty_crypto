@@ -31,21 +31,3 @@ impl<T: Copy, const N: usize> BigMappable<T, N> for [T; N] {
 		new
 	}
 }
-
-/**
- * Right-pads a buffer with secure random bytes, starting at index `start`
- */
-pub fn rightpad<const N: usize>(buf: &mut [u8 ; N], start: usize) {
-	for i in start..buf.len() {
-		buf[i] = StdRng::from_entropy().gen();
-	}
-}
-
-/**
- * Left-pads a buffer with secure random bytes, up until, but NOT including `end`
- */
-pub fn leftpad<const N: usize>(buf: &mut [u8 ; N], end: usize) {
-	for i in 0..end {
-		buf[i] = StdRng::from_entropy().gen()
-	}
-}
