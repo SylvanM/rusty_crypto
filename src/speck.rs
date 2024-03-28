@@ -1,4 +1,5 @@
-use std::mem::transmute;
+use core::panic;
+use std::{io::Write, io::Read, mem::transmute};
 
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
@@ -74,7 +75,7 @@ const fn speck128256_round_inv(x: &[Word ; 2], round_key: u64) -> [Word ; 2] {
 	[x, y]
 }
 
-pub fn enc(key: Key, plaintext: Block) -> Block {
+pub fn enc_block(key: Key, plaintext: Block) -> Block {
 
 	let keys = speck128256_key_schedule(key);
 	let mut ciphertext = bytes_to_words(plaintext);
@@ -86,7 +87,7 @@ pub fn enc(key: Key, plaintext: Block) -> Block {
 	words_to_bytes(ciphertext)
 }
 
-pub fn dec(key: Key, ciphertext: Block) -> Block {
+pub fn dec_block(key: Key, ciphertext: Block) -> Block {
 
 	let keys = speck128256_key_schedule(key);
 	let mut plaintext = bytes_to_words(ciphertext);
@@ -96,6 +97,53 @@ pub fn dec(key: Key, ciphertext: Block) -> Block {
 	}
 
 	words_to_bytes(plaintext)
+}
+
+pub fn enc<R: Read, W: Write>(key: Key, plaintext: &mut R, ciphertext: &mut W) {
+	let mut xor_input = [0 ; BLOCK_SIZE];
+	let mut pt_block = [0 ; BLOCK_SIZE];
+
+	while match plaintext.read(&mut pt_block) {
+		Ok(_) => true,
+		Err(_) => false
+	} {
+		let mut to_encrypt = [0 ; BLOCK_SIZE];
+		for i in 0..BLOCK_SIZE {
+			to_encrypt[i] = xor_input[i] ^ pt_block[i];
+		}
+
+		let encrypted = enc_block(key, to_encrypt);
+		
+		match ciphertext.write(&encrypted) {
+			Ok(_) => (),
+			Err(e) => panic!("Failed to write to ciphertext stream: {:?}", e)
+		}
+
+		xor_input = encrypted
+	}
+}
+
+pub fn dec<R: Read, W: Write>(key: Key, ciphertext: &mut R, plaintext: &mut W) {
+	let mut xor_input = [0 ; BLOCK_SIZE];
+	let mut ct_block = [0 ; BLOCK_SIZE];
+
+	while match ciphertext.read(&mut ct_block) {
+		Ok(_) => true,
+		Err(_) => false
+	} {
+		let mut decrypted = dec_block(key, ct_block);
+
+		for i in 0..BLOCK_SIZE {
+			decrypted[i] ^= xor_input[i];
+		}
+
+		match plaintext.write(&decrypted) {
+			Ok(_) => (),
+			Err(e) => panic!("Failed to write to plaintet stream: {:?}", e)
+		}
+
+		xor_input = ct_block
+	}
 }
 
 fn speck128256_key_schedule(key: Key) -> [Word ; ROUNDS] {
@@ -228,11 +276,16 @@ mod tests {
 
 	#[test]
 	fn test_speck_enc() {
-		assert_eq!(enc(K_BYTES, PT_BYTES), words_to_bytes(KNOWN_ROUND_RESULTS_WORDS[ROUNDS - 1]));
+		assert_eq!(enc_block(K_BYTES, PT_BYTES), words_to_bytes(KNOWN_ROUND_RESULTS_WORDS[ROUNDS - 1]));
 	}
 
 	#[test]
 	fn test_speck_dec() {
-		assert_eq!(dec(K_BYTES, words_to_bytes(KNOWN_ROUND_RESULTS_WORDS[ROUNDS - 1])), PT_BYTES);
+		assert_eq!(dec_block(K_BYTES, words_to_bytes(KNOWN_ROUND_RESULTS_WORDS[ROUNDS - 1])), PT_BYTES);
+	}
+
+	#[test]
+	fn test_streams() {
+		
 	}
 }
