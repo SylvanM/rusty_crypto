@@ -1,7 +1,9 @@
 use core::panic;
-use std::{io::Write, io::Read, mem::transmute};
+use std::{fs::File, io::{Read, Write}, mem::transmute};
 
 use rand::{rngs::StdRng, Rng, SeedableRng};
+
+use crate::utility::PaddedFileStream;
 
 ///
 /// The Speck algorithm designed by the NSA, with a word size of 128 bits, and a 
@@ -99,14 +101,27 @@ pub fn dec_block(key: Key, ciphertext: Block) -> Block {
 	words_to_bytes(plaintext)
 }
 
-pub fn enc<R: Read, W: Write>(key: Key, plaintext: &mut R, ciphertext: &mut W) {
+/**
+ * Encrypts an input stream and writes the result to a writeable output stream.
+ * 
+ * This assumes that the input stream is already padded, so no additional processing
+ * is done on the input stream. Block Chaining is just XORing.
+ */
+pub fn enc(key: Key, plaintext: &mut File, ciphertext: &mut File) {
+
+	let mut padded_pt = PaddedFileStream::<'_, {BLOCK_SIZE}>::new(plaintext);
+
 	let mut xor_input = [0 ; BLOCK_SIZE];
 	let mut pt_block = [0 ; BLOCK_SIZE];
 
-	while match plaintext.read(&mut pt_block) {
-		Ok(_) => true,
-		Err(_) => false
+	while match padded_pt.read(&mut pt_block) {
+		Ok(t) => if t == 0 { false } else { true },
+		Err(e) => {
+			println!("Stopping plaintext read: {:?}", e);
+			false
+		}
 	} {
+
 		let mut to_encrypt = [0 ; BLOCK_SIZE];
 		for i in 0..BLOCK_SIZE {
 			to_encrypt[i] = xor_input[i] ^ pt_block[i];
@@ -115,7 +130,7 @@ pub fn enc<R: Read, W: Write>(key: Key, plaintext: &mut R, ciphertext: &mut W) {
 		let encrypted = enc_block(key, to_encrypt);
 		
 		match ciphertext.write(&encrypted) {
-			Ok(_) => (),
+			Ok(t) => (),
 			Err(e) => panic!("Failed to write to ciphertext stream: {:?}", e)
 		}
 
@@ -123,26 +138,71 @@ pub fn enc<R: Read, W: Write>(key: Key, plaintext: &mut R, ciphertext: &mut W) {
 	}
 }
 
-pub fn dec<R: Read, W: Write>(key: Key, ciphertext: &mut R, plaintext: &mut W) {
-	let mut xor_input = [0 ; BLOCK_SIZE];
-	let mut ct_block = [0 ; BLOCK_SIZE];
+/**
+ * Decrpts an input stream and writes the result to a writeable output stream.
+ * It is assumed that the plaintext write stream is already empty, as no processing
+ * is done to ensure that the file doesn't have extraneous junk.
+ */
+pub fn dec(key: Key, ciphertext: &mut File, plaintext: &mut File) {
 
-	while match ciphertext.read(&mut ct_block) {
-		Ok(_) => true,
-		Err(_) => false
-	} {
+	let mut xor_input 	= [0 ; BLOCK_SIZE];
+	let mut ct_block	= [0 ; BLOCK_SIZE];
+	let mut next_block 	= [0 ; BLOCK_SIZE];
+
+	match ciphertext.read(&mut ct_block) {
+		Ok(t) => if t == 0 { return },
+		Err(e) => panic!("Error reading ciphertext file: {:?}", e)
+	};
+
+	loop  {
+		let this_is_last = match ciphertext.read(&mut next_block) {
+			Ok(t) => if t == 0 { true } else { false },
+			Err(_) => { true }
+		};
+
 		let mut decrypted = dec_block(key, ct_block);
 
 		for i in 0..BLOCK_SIZE {
 			decrypted[i] ^= xor_input[i];
 		}
 
-		match plaintext.write(&decrypted) {
-			Ok(_) => (),
-			Err(e) => panic!("Failed to write to plaintet stream: {:?}", e)
-		}
+		if this_is_last {
+			// get word index
+			let mut last_valid_byte = BLOCK_SIZE - 1;
+			while decrypted[last_valid_byte] == 0 {
+				last_valid_byte -= 1
+			}
 
-		xor_input = ct_block
+			// now we are at a nonzero word. We need to remove the first 1 bit we see!
+			let mut mask = 1;
+			while decrypted[last_valid_byte] & (mask) == 0 {
+				mask <<= 1;
+			}
+			decrypted[last_valid_byte] -= mask;
+
+			// we could have just turned the entire block zero.
+			if decrypted[last_valid_byte] == 0 {
+				last_valid_byte -= 1;
+			}
+
+			println!("On depadding: Found last byte in word to be {:?}, which is {:02X}", last_valid_byte, decrypted[last_valid_byte]);
+
+			match plaintext.write(&decrypted[0..=last_valid_byte]) {
+				Ok(t) => println!("Wrote {:?} bytes for DEPADDED end of plaintext", t),
+				Err(e) => panic!("Failed to write final bytes to plaintext: {:?}", e)
+			};
+
+			return;
+			
+		} else {
+			match plaintext.write(&decrypted) {
+				Ok(_) => (),
+				Err(e) => panic!("Failed to write to plaintext stream: {:?}", e)
+			}
+
+			xor_input = ct_block;
+			ct_block = next_block;
+		}
 	}
 }
 

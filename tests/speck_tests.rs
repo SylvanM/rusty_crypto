@@ -2,9 +2,13 @@
 
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
+use rusty_crypto::lwe::Ciphertext;
 /// Integration tests for Speck128/256
 use rusty_crypto::speck::{self, Block, BLOCK_SIZE};
-use std::io::{ErrorKind, Read, Write};
+use rusty_crypto::utility::PaddedFileStream;
+use core::panic;
+use std::fs::File;
+use std::io::{stdin, ErrorKind, Read, Seek, Write};
 use std::io::Error;
 
 struct BlockStream<const N: usize> where [(); BLOCK_SIZE * N]: Sized {
@@ -54,38 +58,86 @@ impl<const N: usize> Write for BlockStream<N> where [(); BLOCK_SIZE * N]: Sized 
 	} 
 }
 
-#[test]
-fn test_speck() {
-	for i in 0..1 {
-		let mut pt_stream = BlockStream::<10>::new();
-		for i in 0..10 {
-			let t: [u8 ; BLOCK_SIZE] = StdRng::from_entropy().gen();
-			pt_stream.write(&t);
+fn open_file(path: &str) -> File {
+    match File::options().read(true).write(true).open(path) {
+		Ok(f) => f,
+		Err(e) => match File::create(path) {
+			Ok(_) => open_file(path),
+			Err(e) => panic!("Error creating file: {:?}", e)
 		}
-		pt_stream.reset();
+	}
+}
 
-		let mut ct_stream = BlockStream::<10>::new();
+#[test]
+fn test_file_enc() {
+	for i in 0..1 {
+
+		let mut plaintext_file = open_file("tests/test_files/plaintext");
+
+		// write some random bits!
+
+		for _ in 0..412893 { // arbitrary file length
+			let byte: [u8 ; 1] = [StdRng::from_entropy().gen()];
+			plaintext_file.write(&byte);
+		}
+		println!("Wrote random bytes to plaintext file.");
+
+		plaintext_file.rewind();
+		println!("Done writing");
+
+		let mut ciphertext_file = open_file("tests/test_files/ciphertext");
+
+		println!("Created ciphertext file");
 
 		let key = speck::gen();
-		speck::enc(key, &mut pt_stream, &mut ct_stream);
 
-		ct_stream.reset();
+		speck::enc(key, &mut plaintext_file, &mut ciphertext_file);
 
-		let mut rec_stream = BlockStream::<10>::new();
-		speck::dec(key, &mut ct_stream, &mut rec_stream);
+		println!("Encrypted!");
 
-		rec_stream.reset();
-		pt_stream.reset();
+		
+		match ciphertext_file.rewind() {
+			Ok(_) => (),
+			Err(_) => panic!("at the disco")
+		};
 
-		for _ in 0..10 {
-			let mut b1 = [0 ; BLOCK_SIZE];
-			let mut b2 = [0 ; BLOCK_SIZE];
+		println!("Opening recovered file");
+		let mut recovered = open_file("tests/test_files/recovered");
+		recovered.rewind();
 
-			pt_stream.read(&mut b1);
-			rec_stream.read(&mut b2);
+		speck::dec(key, &mut ciphertext_file, &mut recovered);
+		println!("Decrypted!");
 
-			assert_eq!(b1, b2)
+		// compare both files!
+
+		recovered.rewind();
+		plaintext_file.rewind();
+
+		let rec_len = recovered.metadata().unwrap().len();
+		let pt_len = recovered.metadata().unwrap().len();
+
+		let min_len = std::cmp::min(rec_len, pt_len);
+
+		for i in 0..min_len {
+			let mut pt_byte = [0];
+			let mut re_byte = [0];
+
+			match plaintext_file.read(&mut pt_byte[0..1]) {
+				Ok(_) => (),
+				Err(e) => panic!("Error reading! {:?}", e)
+			};
+
+			match recovered.read(&mut re_byte[0..1]) {
+				Ok(_) => (),
+				Err(e) => panic!("Error reading! {:?}", e)
+			};
+
+			assert_eq!(pt_byte[0], re_byte[0], "Bad decryption on byte {:?}. Should be {:02x}, actually is {:02x}", i, pt_byte[0], re_byte[0]);
 		}
+
+		assert_eq!(rec_len, pt_len, "Files of unequal size upon decryption");
+
+		println!("Decryption successful!");
 
 	}
 }
