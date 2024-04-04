@@ -80,20 +80,15 @@ fn test_file_enc() {
 			let byte: [u8 ; 1] = [StdRng::from_entropy().gen()];
 			plaintext_file.write(&byte);
 		}
-		println!("Wrote random bytes to plaintext file.");
-
+		
 		plaintext_file.rewind();
-		println!("Done writing");
 
 		let mut ciphertext_file = open_file("tests/test_files/ciphertext");
-
-		println!("Created ciphertext file");
 
 		let key = speck::gen();
 
 		speck::enc(key, &mut plaintext_file, &mut ciphertext_file);
 
-		println!("Encrypted!");
 
 		
 		match ciphertext_file.rewind() {
@@ -101,13 +96,11 @@ fn test_file_enc() {
 			Err(_) => panic!("at the disco")
 		};
 
-		println!("Opening recovered file");
 		let mut recovered = open_file("tests/test_files/recovered");
 		recovered.rewind();
 
 		speck::dec(key, &mut ciphertext_file, &mut recovered);
-		println!("Decrypted!");
-
+		
 		// compare both files!
 
 		recovered.rewind();
@@ -136,8 +129,6 @@ fn test_file_enc() {
 		}
 
 		assert_eq!(rec_len, pt_len, "Files of unequal size upon decryption");
-
-		println!("Decryption successful!");
 
 	}
 }

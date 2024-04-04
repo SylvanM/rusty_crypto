@@ -55,7 +55,6 @@ impl<const K: usize> PaddedFileStream<'_, K> {
 		let size = file.metadata().unwrap().len() as usize;
 		let word_count = size / K;
 		let dangling_bytes =  size % K;
-		println!("Created padded file with word count: {:?}", word_count);
 		PaddedFileStream { file: file, counter: 0, word_count: word_count, dangling_count: dangling_bytes }
 	}
 
@@ -87,7 +86,6 @@ impl<const K: usize> Read for PaddedFileStream<'_, K> {
 			self.counter += 1;
 			Ok(bytes_read + (K - self.dangling_count))
 		} else {
-			println!("Got to end of file at word {:?}", self.counter);
 			Err( Error::new(std::io::ErrorKind::Other, "End of file") )
 		}
 	}

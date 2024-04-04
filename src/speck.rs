@@ -116,10 +116,7 @@ pub fn enc(key: Key, plaintext: &mut File, ciphertext: &mut File) {
 
 	while match padded_pt.read(&mut pt_block) {
 		Ok(t) => if t == 0 { false } else { true },
-		Err(e) => {
-			println!("Stopping plaintext read: {:?}", e);
-			false
-		}
+		Err(e) => false
 	} {
 
 		let mut to_encrypt = [0 ; BLOCK_SIZE];
@@ -185,10 +182,8 @@ pub fn dec(key: Key, ciphertext: &mut File, plaintext: &mut File) {
 				last_valid_byte -= 1;
 			}
 
-			println!("On depadding: Found last byte in word to be {:?}, which is {:02X}", last_valid_byte, decrypted[last_valid_byte]);
-
 			match plaintext.write(&decrypted[0..=last_valid_byte]) {
-				Ok(t) => println!("Wrote {:?} bytes for DEPADDED end of plaintext", t),
+				Ok(_) => (),
 				Err(e) => panic!("Failed to write final bytes to plaintext: {:?}", e)
 			};
 
