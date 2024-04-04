@@ -25,14 +25,26 @@ pub type Key = [u8 ; KEY_SIZE];
 
 const ROUNDS: usize = 34;
 
-
-
 /// 
 /// Speck encryption scheme
 /// 
 
 pub fn gen() -> Key {
 	StdRng::from_entropy().gen()
+}
+
+pub fn key_to_str(key: Key) -> String {
+	key.map(|b| format!("{:02x}", b)).concat()
+}
+
+pub fn str_to_key(keystr: String) -> Key {
+	let mut bytes = [0 ; KEY_SIZE];
+
+	for i in 0..KEY_SIZE {
+		bytes[i] = u8::from_str_radix(&keystr[(i * 2)..=(i * 2 + 1)], 16).unwrap()
+	}
+
+	bytes
 }
 
 /// 
@@ -340,7 +352,19 @@ mod tests {
 	}
 
 	#[test]
-	fn test_streams() {
-		
+	fn test_key_str() {
+		let silly_str = "0000000000000000000000000000000000000000000000000000000000000000".to_string();
+		let silly_key = str_to_key(silly_str);
+		for i in 0..KEY_SIZE {
+			assert_eq!(silly_key[i], 0)
+		}
+
+		for _ in 0..100 {
+			let key = gen();
+			println!("{:?}", key_to_str(key));
+			let key_str = key_to_str(key);
+			let recovered = str_to_key(key_str);
+			assert_eq!(recovered, key)
+		}
 	}
 }
