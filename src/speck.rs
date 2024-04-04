@@ -367,4 +367,5 @@ mod tests {
 			assert_eq!(recovered, key)
 		}
 	}
+
 }
