@@ -11,6 +11,9 @@ use rand::seq::IteratorRandom;
 
 use crate::{algebra::*, index};
 
+pub type Secret<const Q: i64> = ZM<Q>;
+pub type Share<const Q: i64> = (usize, ZM<Q>);
+
 // -- Shamir Secret Sharing --
 
 /// Adi Shamir's t-out-of-k secret sharing scheme, where only t out of k total 
@@ -19,7 +22,7 @@ use crate::{algebra::*, index};
 /// Precondition:
 ///		- Q is prime 
 ///		- Q > K
-pub fn distribute<const T: usize, const K: usize, const Q: i64>(secret: ZM<Q>) -> [(usize, ZM<Q>) ; K] where [(); K * T as usize]: Sized {
+pub fn distribute<const T: usize, const K: usize, const Q: i64>(secret: Secret<Q>) -> [Share<Q> ; K] where [(); K * T as usize]: Sized {
 	let mut hs = [ZM::<Q>::ZERO ; T as usize];
 	hs[0] = secret;
 
