@@ -7,9 +7,10 @@
 // and removing the import causes an error
 // use rand::seq::IteratorRandom;
 
+use matrix_kit::{index, matrix::Matrix};
 use rand::seq::IteratorRandom;
 
-use crate::{algebra::*, index};
+use algebra_kit::{algebra::*, std_impls::*};
 
 pub type Secret<const Q: i64> = ZM<Q>;
 pub type Share<const Q: i64> = (usize, ZM<Q>);
@@ -22,38 +23,37 @@ pub type Share<const Q: i64> = (usize, ZM<Q>);
 /// Precondition:
 ///		- Q is prime 
 ///		- Q > K
-pub fn distribute<const T: usize, const K: usize, const Q: i64>(secret: Secret<Q>) -> [Share<Q> ; K] where [(); K * T as usize]: Sized {
-	let mut hs = [ZM::<Q>::ZERO ; T as usize];
-	hs[0] = secret;
+pub fn distribute<const T: usize, const K: usize, const Q: i64>(secret: Secret<Q>) -> [Share<Q> ; K] where [(); K * T]: Sized, [(); T * 1]: Sized, [() ; K * 1]: Sized {
+	let mut hs = Matrix::<T, 1, ZM::<Q>>::new();
+	hs.flatmap[0] = secret;
 
 	for i in 1..T {
-		hs[i as usize] = ZM::<Q>::rnd();
+		hs.flatmap[i as usize] = ZM::<Q>::rnd();
 	}
 
 	// Now we have the random guys, we need to create the Vandermonde matrix
-	let mut vandermonde = [ZM::<Q>::ZERO ; K * T as usize];
+	// let mut vandermonde = [ZM::<Q>::zero() ; K * T as usize];
+	let mut vandermonde = Matrix::<K, T, ZM<Q>>::new();
 
 	for i in 0..K {
 		for j in 0..T {
-			vandermonde[index!(K, T, i, j)] = (ZM::<Q>::from_int(i as i64)).power(j as i64);
+			vandermonde.flatmap[index!(K, T, i, j)] = (ZM::<Q>::from_int(i as i64)).power(j as i64);
 		}
 	}
 
-	let mut shares = [ZM::<Q>::ZERO ; K];
+	let shares = vandermonde * hs;
 
-	mat_mul_ptrs::<K, T, 1, ZM<Q>>(&vandermonde, &hs, &mut shares);
-
-	let mut labeled_shares = [(0, ZM::<Q>::ZERO) ; K];
+	let mut labeled_shares = [(0, ZM::<Q>::zero()) ; K];
 
 	for i in 0..K {
-		labeled_shares[i] = (i, shares[i]);
+		labeled_shares[i] = (i, shares.flatmap[i]);
 	}
 
 	labeled_shares
 }
 
 fn h<const T: usize, const Q: i64>(i: usize, a: [ZM<Q> ; T], x: ZM<Q>) -> ZM<Q> {
-	let mut value = ZM::<Q>::ONE;
+	let mut value = ZM::<Q>::one();
 
 	for j in 0..T {
 		if i == j {
@@ -70,8 +70,8 @@ pub fn reconstruct<const T: usize, const K: usize, const Q: i64>(shares: &[(usiz
 	// Lagrange interpolation! It's a clever idea
 
 	// let's unzip the shares
-	let mut xs = [ZM::<Q>::ZERO ; T];
-	let mut ys = [ZM::<Q>::ZERO ; T];
+	let mut xs = [ZM::<Q>::zero() ; T];
+	let mut ys = [ZM::<Q>::zero() ; T];
 
 	for i in 0..T {
 		let (x, y) = shares[i];
@@ -86,19 +86,19 @@ pub fn reconstruct<const T: usize, const K: usize, const Q: i64>(shares: &[(usiz
 	// so, we need to compute all p_i(0)
 	// we will have p_i(0) = alpha_i h_i(0), where alpha_i = h_i(shares[i]_0)
 
-	let mut inverses = [ZM::<Q>::ZERO ; T];
+	let mut inverses = [ZM::<Q>::zero() ; T];
 	
 	for i in 0..T {
 		inverses[i] = h::<T, Q>(i, xs, xs[i]).inverse();
 	}
 
-	let mut ps = [ZM::<Q>::ZERO ; T];
+	let mut ps = [ZM::<Q>::zero() ; T];
 
 	for i in 0..T {
-		ps[i] = inverses[i] * h::<T, Q>(i, xs, ZM::<Q>::ZERO);
+		ps[i] = inverses[i] * h::<T, Q>(i, xs, ZM::<Q>::zero());
 	}
 
-	let mut secret = ZM::<Q>::ZERO;
+	let mut secret = ZM::<Q>::zero();
 
 	for i in 0..T {
 		secret += ys[i] * ps[i];
@@ -113,7 +113,7 @@ fn test_secret_sharing() {
 	
 	// super simple test, with Q = 11, K = 10, and T = 5. So, we only need 5 out of 10 shares.
 
-	fn sss_test<const T: usize, const K: usize, const Q: i64>() where [() ; K * T as usize]: Sized {
+	fn sss_test<const T: usize, const K: usize, const Q: i64>() where [() ; K * T]: Sized, [() ; T * 1]: Sized, [() ; K * 1]: Sized {
 		for _ in 0..100 {
 			let secret = ZM::<Q>::rnd();
 			let shares = distribute::<T, K, Q>(secret);
@@ -121,7 +121,7 @@ fn test_secret_sharing() {
 			// come up with random ways of combining the shares!
 			for _ in 0..10 {
 				let share_combo_refs = shares.iter().choose_multiple(&mut rand::thread_rng(), T);
-				let mut share_combo = [(0, ZM::<Q>::ZERO) ; T];
+				let mut share_combo = [(0, ZM::<Q>::zero()) ; T];
 
 				for i in 0..T {
 					share_combo[i] = *share_combo_refs[i]

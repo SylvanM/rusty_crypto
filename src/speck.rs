@@ -1,9 +1,9 @@
 use core::panic;
-use std::{fs::File, io::{Read, Write}, mem::transmute};
+use std::{fs::File, io::{Read, Write}, mem::transmute, vec};
 
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
-use crate::utility::PaddedFileStream;
+use crate::{lwe::Ciphertext, utility::PaddedFileStream};
 
 ///
 /// The Speck algorithm designed by the NSA, with a word size of 128 bits, and a 
@@ -76,6 +76,7 @@ fn words_to_bytes(block: [Word ; 2]) -> Block {
 /// Speck actual encryption methods
 /// 
 
+
 const fn speck128256_round(x: [Word ; 2], round_key: u64) -> [Word ; 2] {
 	let rotated_x = x[0].rotate_right(8);
 	let added = rotated_x.wrapping_add(x[1]);
@@ -88,6 +89,8 @@ const fn speck128256_round_inv(x: &[Word ; 2], round_key: u64) -> [Word ; 2] {
 	let x = (x[0] ^ round_key).wrapping_sub(y).rotate_left(8);
 	[x, y]
 }
+
+// MARK: Blocks
 
 pub fn enc_block(key: Key, plaintext: Block) -> Block {
 
@@ -113,6 +116,114 @@ pub fn dec_block(key: Key, ciphertext: Block) -> Block {
 	words_to_bytes(plaintext)
 }
 
+pub fn enc_block_chain(key: Key, previous_ct: Block, plaintext: Block) -> Block {
+	let mut to_encrypt = [0 ; BLOCK_SIZE];
+	for i in 0..BLOCK_SIZE {
+		to_encrypt[i] = previous_ct[i] ^ plaintext[i];
+	}
+
+	enc_block(key, to_encrypt)
+}
+
+pub fn dec_block_chain(key: Key, previous_ct: Block, ciphertext: Block) -> Block {
+	let mut pt = dec_block(key, ciphertext);
+	for i in 0..BLOCK_SIZE {
+		pt[i] ^= previous_ct[i]
+	}
+	pt
+}
+
+// MARK: Vectors
+
+/// Pads a byte vector so that it has enough bytes to have whole number of blocks
+pub fn pad_vec(pt: Vec<u8>) -> Vec<u8> {
+	let blocks_to_add = BLOCK_SIZE - (pt.len() % BLOCK_SIZE);
+	let mut padded_pt = vec![0 ; pt.len() + blocks_to_add];
+	
+	// copy the original plaintext
+	for i in 0..pt.len() {
+		padded_pt[i] = pt[i];
+	}
+
+	// pad! The other blocks are already zeroes, so we're actually all done here.
+	padded_pt[pt.len()] = 1;
+
+	padded_pt
+}
+
+/// Removes the padding from a vector
+pub fn depad_vec(padded_pt: Vec<u8>) -> Vec<u8> {
+	let mut truncate_index = padded_pt.len();
+
+	for i in (0..padded_pt.len()).rev() {
+		if padded_pt[i] == 1 { 
+			break; 
+		}
+		else if padded_pt[i] == 0 {
+			truncate_index = i;
+		} else {
+			panic!("Invalid padding");
+		}
+	}
+
+	padded_pt[0..truncate_index].to_vec()
+}
+
+/// Converts a padded byte vector into a block vector
+/// 
+/// This assumes the bytes are already the appropriate length
+pub fn bytes_to_blocks(bytes: Vec<u8>) -> Vec<Block> {
+	let mut blocks = vec![[0 ; BLOCK_SIZE] ; bytes.len() / BLOCK_SIZE];
+	for i in 0..blocks.len() {
+		blocks[i] = bytes[(i * BLOCK_SIZE)..(i * BLOCK_SIZE + BLOCK_SIZE)].try_into().unwrap();
+	}
+	blocks
+}
+
+/// Converts a block vector into a byte vector
+pub fn blocks_to_bytes(blocks: Vec<Block>) -> Vec<u8> {
+	let mut bytes = vec![0 ; blocks.len() * BLOCK_SIZE];
+
+	for b in 0..blocks.len() {
+		for j in 0..BLOCK_SIZE {
+			bytes[b * BLOCK_SIZE + j] = blocks[b][j];
+		}
+	}
+
+	bytes
+}
+
+/// Encrypts a byte vector
+pub fn enc_vec(key: Key, plaintext: Vec<u8>) -> Vec<u8> {
+	let padded_pt = pad_vec(plaintext);
+	let pt_blocks = bytes_to_blocks(padded_pt);
+	let mut ct_blocks = vec![[0 ; BLOCK_SIZE] ; pt_blocks.len()];
+
+	ct_blocks[0] = enc_block(key, pt_blocks[0]);
+
+	for i in 1..ct_blocks.len() {
+		ct_blocks[i] = enc_block_chain(key, ct_blocks[i - 1], pt_blocks[i]);
+	}
+
+	blocks_to_bytes(ct_blocks)
+}
+
+/// Decrypts a byte vector
+pub fn dec_vec(key: Key, ciphertext: Vec<u8>) -> Vec<u8> {
+	let ct_blocks = bytes_to_blocks(ciphertext);
+	let mut pt_blocks = vec![[0 ; BLOCK_SIZE] ; ct_blocks.len()];
+
+	pt_blocks[0] = dec_block(key, ct_blocks[0]);
+
+	for i in 1..pt_blocks.len() {
+		pt_blocks[i] = dec_block_chain(key, ct_blocks[i - 1], ct_blocks[i]);
+	}
+
+	depad_vec(blocks_to_bytes(pt_blocks))
+}
+
+// MARK: Files
+
 /**
  * Encrypts an input stream and writes the result to a writeable output stream.
  * 
@@ -131,12 +242,7 @@ pub fn enc(key: Key, plaintext: &mut File, ciphertext: &mut File) {
 		Err(e) => false
 	} {
 
-		let mut to_encrypt = [0 ; BLOCK_SIZE];
-		for i in 0..BLOCK_SIZE {
-			to_encrypt[i] = xor_input[i] ^ pt_block[i];
-		}
-
-		let encrypted = enc_block(key, to_encrypt);
+		let encrypted = enc_block_chain(key, xor_input, pt_block);
 		
 		match ciphertext.write(&encrypted) {
 			Ok(t) => (),

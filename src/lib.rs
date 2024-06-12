@@ -7,6 +7,5 @@
 pub mod speck;
 pub mod lwe;
 pub mod secsharing;
-pub mod algebra;
 pub mod utility;
 pub mod padding;

@@ -4,8 +4,10 @@
 
 use std::mem::transmute;
 
-use crate::algebra::*;
-use crate::index;
+use algebra_kit::std_impls::*;
+use matrix_kit::index;
+use matrix_kit::matrix::*;
+
 use crate::utility::BigMappable;
 
 use rand::rngs::StdRng;
@@ -170,40 +172,39 @@ fn gen_mat<const M: usize, const N: usize, const Q: i64, const S: i64, const K: 
 	// println!("GENERATING Key pair");
 	
 	// generate the secret, S
-	let mut s = [0.into(); N * K];
+	
+	let mut s = Matrix::<N, K, ZM<Q>>::new();
 
 	for i in 0..(N * K) {
-		s[i] = ZM::<Q>::rnd();
+		s.flatmap[i] = ZM::<Q>::rnd();
 	}
 
 	// generate the public key A
-	let mut a = [0.into() ; M * N];
+	let mut a = Matrix::<M, N, ZM<Q>>::new();
 
 	for i in 0..(M * N) {
-		a[i] = ZM::<Q>::rnd();
+		a.flatmap[i] = ZM::<Q>::rnd();
 	}
 	
 	// Compute AS + E
-	let mut b = [0.into() ; M * K];
+	let b = a * s;
 
-	mat_mul_ptrs::<M, N, K, ZM<Q>>(&a, &s, &mut b);
+	let mut e = Matrix::<M, K, ZM<Q>>::new();
+	error_gen::<M, K, Q, S>(&mut e.flatmap);
 
-	let mut e = [0.into() ; M * K];
-	error_gen::<M, K, Q, S>(&mut e);
-
-	let mut pubkey = [0.into() ; M * (N + K)];
+	let mut pubkey = Matrix::<M, {N + K}, ZM<Q>>::new();
 	
 	// we copy the A matrix into the left side of the public key
 	for r in 0..M {
 		for c in 0..N {
-			pubkey[index!(M, N + K, r, c)] = a[index!(M, N, r , c)];
+			pubkey.flatmap[matrix_kit::index!(M, N + K, r, c)] = a.flatmap[matrix_kit::index!(M, N, r , c)];
 		}
 	}
 
 	// add the error to AS, and store it in the right-hand side of the public key
-	mat_add::<M, K, ZM<Q>>(&b, &e, &mut pubkey[index!(M, N + K, 0, N)..index!(M, N + K, M, N + K - 1)]);
+	mat_add::<M, K, ZM<Q>>(&b.flatmap, &e.flatmap, &mut pubkey.flatmap[index!(M, N + K, 0, N)..index!(M, N + K, M, N + K - 1)]);
 
-	(s, Box::new(pubkey))
+	(s.flatmap, Box::new(pubkey.flatmap))
 
 }
 
