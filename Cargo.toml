@@ -1,6 +1,6 @@
 [package]
 name = "rusty_crypto"
-version = "0.1.18"
+version = "0.1.19"
 edition = "2021"
 license = "GPL-3.0-or-later"
 description = "A simple cryptographic suite for Rust"
@@ -13,5 +13,6 @@ readme = "README.md"
 [dependencies]
 algebra_kit = "0.1.10"
 matrix_kit = "0.1.9"
+pqc_kyber = "0.7.1"
 rand = "0.8"
 
