@@ -9,3 +9,4 @@ pub mod lwe;
 pub mod secsharing;
 pub mod utility;
 pub mod padding;
+pub mod sha512;

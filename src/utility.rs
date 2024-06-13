@@ -83,7 +83,7 @@ impl<const K: usize> Read for PaddedFileStream<'_, K> {
 					Err(_) => panic!("Error reading last byte {:?}", i)
 				};
 			}
-			crate::padding::pad(buf, self.dangling_count, 0, K);
+			crate::padding::pad_buf(buf, self.dangling_count, 0, K);
 			self.counter += 1;
 			Ok(bytes_read + (K - self.dangling_count))
 		} else {

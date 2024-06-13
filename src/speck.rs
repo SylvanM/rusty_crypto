@@ -3,7 +3,7 @@ use std::{fs::File, io::{Read, Write}, mem::transmute, vec};
 
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
-use crate::{lwe::Ciphertext, utility::PaddedFileStream};
+use crate::{lwe::Ciphertext, padding, utility::PaddedFileStream};
 
 ///
 /// The Speck algorithm designed by the NSA, with a word size of 128 bits, and a 
@@ -135,40 +135,6 @@ pub fn dec_block_chain(key: Key, previous_ct: Block, ciphertext: Block) -> Block
 
 // MARK: Vectors
 
-/// Pads a byte vector so that it has enough bytes to have whole number of blocks
-pub fn pad_vec(pt: Vec<u8>) -> Vec<u8> {
-	let blocks_to_add = BLOCK_SIZE - (pt.len() % BLOCK_SIZE);
-	let mut padded_pt = vec![0 ; pt.len() + blocks_to_add];
-	
-	// copy the original plaintext
-	for i in 0..pt.len() {
-		padded_pt[i] = pt[i];
-	}
-
-	// pad! The other blocks are already zeroes, so we're actually all done here.
-	padded_pt[pt.len()] = 1;
-
-	padded_pt
-}
-
-/// Removes the padding from a vector
-pub fn depad_vec(padded_pt: Vec<u8>) -> Vec<u8> {
-	let mut truncate_index = padded_pt.len();
-
-	for i in (0..padded_pt.len()).rev() {
-		if padded_pt[i] == 1 { 
-			break; 
-		}
-		else if padded_pt[i] == 0 {
-			truncate_index = i;
-		} else {
-			panic!("Invalid padding");
-		}
-	}
-
-	padded_pt[0..truncate_index].to_vec()
-}
-
 /// Converts a padded byte vector into a block vector
 /// 
 /// This assumes the bytes are already the appropriate length
@@ -195,7 +161,7 @@ pub fn blocks_to_bytes(blocks: Vec<Block>) -> Vec<u8> {
 
 /// Encrypts a byte vector
 pub fn enc_vec(key: Key, plaintext: Vec<u8>) -> Vec<u8> {
-	let padded_pt = pad_vec(plaintext);
+	let padded_pt = padding::pad_sha256(plaintext);
 	let pt_blocks = bytes_to_blocks(padded_pt);
 	let mut ct_blocks = vec![[0 ; BLOCK_SIZE] ; pt_blocks.len()];
 
@@ -219,7 +185,7 @@ pub fn dec_vec(key: Key, ciphertext: Vec<u8>) -> Vec<u8> {
 		pt_blocks[i] = dec_block_chain(key, ct_blocks[i - 1], ct_blocks[i]);
 	}
 
-	depad_vec(blocks_to_bytes(pt_blocks))
+	padding::unpad_sha256(blocks_to_bytes(pt_blocks))
 }
 
 // MARK: Files
@@ -471,6 +437,23 @@ mod tests {
 			let key_str = key_to_str(key);
 			let recovered = str_to_key(key_str);
 			assert_eq!(recovered, key)
+		}
+	}
+
+	#[test]
+	fn test_vec_enc() {
+		for _ in 0..100 {
+			let key = gen();
+
+			let vec_len: usize = rand::thread_rng().gen_range(1..10000);
+			let mut rand_vec = vec![0 ; vec_len];
+			for i in 0..vec_len {
+				rand_vec[i] = rand::thread_rng().gen();
+			}
+
+			let ct = enc_vec(key, rand_vec.clone());
+			let decrypted = dec_vec(key, ct);
+			assert_eq!(rand_vec, decrypted);
 		}
 	}
 
