@@ -9,29 +9,29 @@ use crate::padding;
 type Word = u64;
 
 /// The amount of bits in a SHA-512 digest
-const DIGEST_BIT_COUNT: usize = 512;
+pub const DIGEST_BIT_COUNT: usize = 512;
 
 /// The amount of bytes in a SHA-512 digest
-const DIGEST_BYTE_COUNT: usize = DIGEST_BIT_COUNT / 8;
+pub const DIGEST_BYTE_COUNT: usize = DIGEST_BIT_COUNT / 8;
 
 /// The amount of words in a SHA-512 digest
-const DIGEST_WORD_COUNT: usize = DIGEST_BYTE_COUNT / std::mem::size_of::<Word>();
+pub const DIGEST_WORD_COUNT: usize = DIGEST_BYTE_COUNT / std::mem::size_of::<Word>();
 
 /// The amount of bits in a chunk that SHA hashes at a time
-const CHUNK_BIT_COUNT: usize = 1024;
+pub const CHUNK_BIT_COUNT: usize = 1024;
 
 /// The amount of bytes in a chunk
-const CHUNK_BYTE_COUNT: usize = CHUNK_BIT_COUNT / 8;
+pub const CHUNK_BYTE_COUNT: usize = CHUNK_BIT_COUNT / 8;
 
 /// The amount of words in a chunk
-const CHUNK_WORD_COUNT: usize = CHUNK_BYTE_COUNT / std::mem::size_of::<Word>();
+pub const CHUNK_WORD_COUNT: usize = CHUNK_BYTE_COUNT / std::mem::size_of::<Word>();
 
-const ROUNDS: usize = 80;
+pub const ROUNDS: usize = 80;
 
 /// The 512-bit hash from SHA-512, as an array of words
-type Digest = [u8 ; DIGEST_BYTE_COUNT];
+pub type Digest = [u8 ; DIGEST_BYTE_COUNT];
 
-type Chunk = [Word ; CHUNK_WORD_COUNT];
+pub type Chunk = [Word ; CHUNK_WORD_COUNT];
 
 // MARK: Algorithm Constants
 
