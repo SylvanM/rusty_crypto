@@ -15,4 +15,5 @@ algebra_kit = "0.1.10"
 matrix_kit = "0.1.9"
 pqc_kyber = "0.7.1"
 rand = "0.8"
+sylvan_number = "0.1.5"
 
