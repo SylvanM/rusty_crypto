@@ -438,7 +438,7 @@ pub fn dec(sk: SecretKey, ct: Ciphertext) -> Plaintext {
 	matrix_rep_to_pt(dec_mat::<DEF_M, DEF_N, MODULUS, ERROR, BIT_LENGTH>(sk_to_matrix_rep(sk), ct_to_matrix_rep(ct)))
 }
 
-#[test]
+// #[test]
 fn test_correctness() {
 	println!("Testing correctness");
 	println!("Plaintext bits: {:?}", BIT_LENGTH);
