@@ -7,13 +7,11 @@
 // and removing the import causes an error
 // use rand::seq::IteratorRandom;
 
-use std::{mem::transmute, usize};
-
-use matrix_kit::{index, matrix::Matrix};
+use std::{mem::transmute, u64, usize};
 use super::types::*;
 
-use algebra_kit::{algebra::*, std_impls::*};
-use sylvan_number::{bignumber::BigNumber, ubignumber::{UBigNumber, Word}};
+use algebra_kit::algebra::*;
+use sylvan_number::ubignumber::{UBigNumber, Word};
 
 // MARK: The Math Stuff
 
@@ -24,39 +22,37 @@ type Point = (u64, ZMQ);
 
 /// Adi Shamir's t-out-of-k secret sharing scheme, where only t out of k total 
 /// shares are required to recover the secret, and the secret can be contained in 256 bits.
-pub fn create_curve<const T: usize, const K: usize>(secret: Intercept) -> [Point ; K] where [(); K * T]: Sized, [(); T * 1]: Sized, [() ; K * 1]: Sized {
-	let mut hs = Matrix::<T, 1, ZMQ>::new();
-	hs.flatmap[0] = secret;
+pub fn create_curve(t: usize, k: usize, secret: Intercept) -> Vec<Point> {
+	// we create a random polynomial with the intercept being the secret, and each share is a point somewhere!
 
-	for i in 1..T {
-		hs.flatmap[i as usize] = ZMQ::rnd();
+	let mut coefficients: Vec<ZMQ> = vec![ZMQ { data: [0 ; 5] } ; t];
+	coefficients[0] = secret;
+	for i in 1..t {
+		coefficients[i] = ZMQ::rnd();
 	}
 
-	// Now we have the random guys, we need to create the Vandermonde matrix
-	// let mut vandermonde = [ZM::<Q>::zero() ; K * T as usize];
-	let mut vandermonde = Matrix::<K, T, ZMQ>::new();
+	let mut points: Vec<Point> = vec![(0, ZMQ { data: [0 ; 5] }) ; k];
 
-	for i in 0..K {
-		for j in 0..T {
-			vandermonde.flatmap[index!(K, T, i, j)] = (ZMQ::from_ubn((i as u64).into())).power(j as i64);
+	for i in 0..k {
+
+		// compute the polynomial!
+		let mut polynomial_value = ZMQ::zero();
+
+		for j in 0..t {
+			polynomial_value += coefficients[j] * ZMQ::from_ubn((i as u64).into()).power(j as i64);
 		}
+
+		points[i] = (i as u64, polynomial_value)
 	}
 
-	let shares = vandermonde * hs;
+	points
 
-	let mut labeled_shares = [(0u64, ZMQ::zero()) ; K];
-
-	for i in 0..K {
-		labeled_shares[i] = (i as u64, shares.flatmap[i]);
-	}
-
-	labeled_shares
 }
 
-fn h<const T: usize>(i: usize, a: [ZMQ ; T], x: ZMQ) -> ZMQ {
+fn h(t: usize, i: usize, a: Vec<ZMQ>, x: ZMQ) -> ZMQ {
 	let mut value = ZMQ::one();
 
-	for j in 0..T {
+	for j in 0..t {
 		if i == j {
 			continue;
 		}
@@ -67,14 +63,14 @@ fn h<const T: usize>(i: usize, a: [ZMQ ; T], x: ZMQ) -> ZMQ {
 	value
 }
 
-pub fn lagrange_interpolate<const T: usize, const K: usize>(points: &[Point]) -> Intercept {
+fn lagrange_interpolate(t: usize, points: Vec<Point>) -> Intercept {
 	// Lagrange interpolation! It's a clever idea
 
 	// let's unzip the shares
-	let mut xs = [ZMQ::zero() ; T];
-	let mut ys = [ZMQ::zero() ; T];
+	let mut xs = vec![ZMQ::zero() ; t];
+	let mut ys = vec![ZMQ::zero() ; t];
 
-	for i in 0..T {
+	for i in 0..t {
 		let (x, y) = points[i];
 		xs[i] = ZMQ::from_ubn(UBigNumber::from_int(x as Word));
 		ys[i] = y;
@@ -87,21 +83,21 @@ pub fn lagrange_interpolate<const T: usize, const K: usize>(points: &[Point]) ->
 	// so, we need to compute all p_i(0)
 	// we will have p_i(0) = alpha_i h_i(0), where alpha_i = h_i(shares[i]_0)
 
-	let mut inverses = [ZMQ::zero() ; T];
+	let mut inverses = vec![ZMQ::zero() ; t];
 	
-	for i in 0..T {
-		inverses[i] = h::<T>(i, xs, xs[i]).inverse();
+	for i in 0..t {
+		inverses[i] = h(t, i, xs.clone(), xs[i]).inverse();
 	}
 
-	let mut ps = [ZMQ::zero() ; T];
+	let mut ps = vec![ZMQ::zero() ; t];
 
-	for i in 0..T {
-		ps[i] = inverses[i] * h::<T>(i, xs, ZMQ::zero());
+	for i in 0..t {
+		ps[i] = inverses[i] * h(t, i, xs.clone(), ZMQ::zero());
 	}
 
 	let mut secret = ZMQ::zero();
 
-	for i in 0..T {
+	for i in 0..t {
 		secret += ys[i] * ps[i];
 	}
 
@@ -174,16 +170,18 @@ fn point_to_share(point: Point) -> Share256 {
 	share
 }
 
-/// Creates K shares of a secret, out of which T are required to reconstruct the secret.
-pub fn distribute<const T: usize, const K: usize>(secret: Secret256) -> Vec<Share256> where [(); K * T]: Sized, [(); T * 1]: Sized, [() ; K * 1]: Sized {
-	let points = create_curve::<T, K>(secret_to_intercept(secret));
-	points.map(|p| point_to_share(p)).to_vec()
+/// Creates K shares of a 256-bit secret, out of which T are required to reconstruct the secret.
+pub fn distribute(t: usize, k: usize, secret: Secret256) -> Vec<Share256> {
+	let points = create_curve(t, k, secret_to_intercept(secret));
+	points.into_iter().map(|p| point_to_share(p)).collect()
 }
 
-/// Combines T shares of a secret
-pub fn reconstruct<const T: usize, const K: usize>(shares: [Share256 ; T]) -> Secret256 {
-	let points = shares.map(|s| share_to_point(s));
-	intercept_to_secret(lagrange_interpolate::<T, K>(&points))
+/// Combines T shares of a secret.
+/// 
+/// shares must have length at least t.
+pub fn reconstruct(t: usize, shares: Vec<Share256>) -> Secret256 {
+	let points = shares.into_iter().map(|s| share_to_point(s)).collect();
+	intercept_to_secret(lagrange_interpolate(t, points))
 }
 
 // MARK: Tests
@@ -196,13 +194,13 @@ mod tests {
 
     use crate::{secsharing::sharing::{create_curve, intercept_to_secret, lagrange_interpolate, point_to_share, secret_to_intercept, share_to_point}, speck};
 
-    use super::{distribute, reconstruct, Intercept, Secret256, ZMQ};
+    use super::{distribute, Intercept, Secret256, ZMQ};
 
 	#[test]
 	fn test_converstion_symmetry() {
 		for _ in 0..100 {
 			let secret: Secret256 = speck::gen();
-			let shares = distribute::<3, 4>(secret);
+			let shares = distribute(3, 4, secret);
 
 			assert_eq!(secret, intercept_to_secret(secret_to_intercept(secret)));
 
@@ -220,16 +218,16 @@ mod tests {
 		let share2 = (2, ZMQ::from_ubn(8.into()));
 		let share3 = (3, ZMQ::from_ubn(4.into()));
 
-		assert_eq!(secret, lagrange_interpolate::<3, 3>(&[share1, share2, share3]));
+		assert_eq!(secret, lagrange_interpolate(3, [share1, share2, share3].to_vec()));
 	}
 
 	fn sss_test<const T: usize, const K: usize>() where [() ; K * T]: Sized, [() ; T * 1]: Sized, [() ; K * 1]: Sized {
 		for _ in 0..100 {
 			let secret = ZMQ::rnd();
-			let shares = create_curve::<T, K>(secret);
+			let shares = create_curve(T, K, secret);
 
 			// first, go ahead and recombibe the first T shares.
-			assert_eq!(lagrange_interpolate::<T, K>(&shares[0..T]), secret);
+			assert_eq!(lagrange_interpolate(T, shares[0..T].to_vec()), secret);
 			// come up with random ways of combining the shares!
 			for _ in 0..10 {
 				let share_combo_refs = shares.iter().choose_multiple(&mut rand::thread_rng(), T);
@@ -239,7 +237,7 @@ mod tests {
 					share_combo[i] = *share_combo_refs[i]
 				}
 
-				assert_eq!(lagrange_interpolate::<T, K>(&share_combo[0..T]), secret);
+				assert_eq!(lagrange_interpolate(T, share_combo[0..T].to_vec()), secret);
 			}
 		}
 	}

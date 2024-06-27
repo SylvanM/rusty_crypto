@@ -181,10 +181,31 @@ impl Field for ZMQ {
 #[cfg(test)]
 mod tests {
 
-    use algebra_kit::{algebra::{Field, Ring}, std_impls::ZM};
 	use sylvan_number::ubignumber::UBigNumber;
-
+    use algebra_kit::algebra::{Field, Ring};
+	use rand::Rng;
+	
     use super::ZMQ;
+
+	fn naive_pow(a: ZMQ, b: i64) -> ZMQ {
+		let mut product = ZMQ::one();
+
+		for _ in 0..b {
+			product *= a;
+		}
+
+		product
+	}
+
+	#[test]
+	fn test_pow() {
+		for _ in 0..100 {
+			let x = ZMQ::rnd();
+			let pow = rand::thread_rng().gen_range(0..10000);
+
+			assert_eq!(naive_pow(x, pow), x.power(pow))
+		}
+	}
 
 	#[test]
 	fn test_mul_inv() {
