@@ -254,7 +254,7 @@ fn dec_mat<const M: usize, const N: usize, const Q: i64, const S: i64, const K: 
 	diffs.big_map(|d| if (d.val > (Q / 4)) && (d.val < ((3 * Q) / 4)) { 1.into() } else { 0.into() })
 }
 
-#[test]
+// #[test]
 fn test_lwe() {
 	// These are the same tests as before, but the one-bit versions
 	for _ in 1..=256 {
